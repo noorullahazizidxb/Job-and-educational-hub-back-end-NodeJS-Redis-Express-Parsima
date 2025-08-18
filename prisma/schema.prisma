@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  website   String?
+  logoUrl   String?
+  industry  String?
+  size      String?   // e.g., 11-50, 51-200
+  about     String?
+  description String?  @db.Text
+  address   String?
+  cityId    Int?
+  city      City?     @relation(fields: [cityId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      Job[]
+  users     User[]
+  services  Service[]
+  notificationRecipients NotificationRecipient[]
+
+  @@index([name])
+}
+
+model Job {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  title       String
+  type        JobType
+  location    String
+  salaryMin   Int?
+  salaryMax   Int?
+  currency    String? @default("USD")
+  description String
+  skills      String   // comma separated for simplicity
+  benefits    String?  // comma separated or plain text
+  applyUrl    String?  // alternatively email
+  applyEmail  String?
+  contactEmail String?
+  postedAt    DateTime @default(now())
+  closingDate DateTime?
+  vacancies   Int?     @default(1)
+  experience  ExperienceLevel?
+  education   EducationLevel?
+  gender      Gender?
+  orgType     OrganizationType?
+  status      JobStatus @default(published)
+  featured    Boolean   @default(false)
+  featuredUntil DateTime?
+  views       Int       @default(0)
+  cityId      Int?
+  city        City?     @relation(fields: [cityId], references: [id])
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  categories  JobCategory[]
+  applications JobApplication[]
+  reviews     JobReview[]
+
+  @@index([title, location, type])
+  @@index([status, closingDate])
+}
+
+enum JobType {
+  full_time
+  part_time
+  contract
+  internship
+  temporary
+  remote
+}
+
+enum JobStatus {
+  draft
+  published
+  closed
+}
+
+enum ExperienceLevel {
+  entry
+  mid
+  senior
+  lead
+}
+
+enum EducationLevel {
+  high_school
+  diploma
+  bachelor
+  master
+  doctorate
+}
+
+enum Gender {
+  any
+  male
+  female
+}
+
+enum OrganizationType {
+  private
+  government
+  ngo
+  international_org
+  other
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      JobCategory[]
+}
+
+model JobCategory {
+  jobId     Int
+  categoryId Int
+  job       Job      @relation(fields: [jobId], references: [id])
+  category  Category @relation(fields: [categoryId], references: [id])
+
+  @@id([jobId, categoryId])
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String
+  province  String?
+  country   String?  @default("Afghanistan")
+  companies Company[]
+  jobs      Job[]
+  services  Service[]
+}
+
+model Advertisement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  placement AdPlacement
+  imageUrl  String
+  targetUrl String
+  isActive  Boolean  @default(true)
+  startAt   DateTime?
+  endAt     DateTime?
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([placement, isActive, startAt, endAt])
+}
+
+enum AdPlacement {
+  homepage_hero
+  homepage_sidebar
+  job_list_top
+  job_detail_sidebar
+  sitewide_banner
+}
+
+// Services such as Procurement Opportunities and Scholarships
+model Service {
+  id           Int          @id @default(autoincrement())
+  type         ServiceType
+  title        String
+  slug         String       @unique
+  description  String
+  organization String?
+  companyId    Int?
+  company      Company?     @relation(fields: [companyId], references: [id])
+  cityId       Int?
+  city         City?        @relation(fields: [cityId], references: [id])
+  country      String?      @default("Afghanistan")
+  category     String?
+  tags         String?      // comma separated
+  eligibility  String?
+  documents    Json?
+  applyUrl     String?
+  contactEmail String?
+  postedAt     DateTime     @default(now())
+  closingDate  DateTime?
+  status       ServiceStatus @default(published)
+  featured     Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  applications ServiceApplication[]
+
+  @@index([type, status, closingDate])
+}
+
+enum ServiceType {
+  procurement
+  scholarship
+}
+
+enum ServiceStatus {
+  draft
+  published
+  closed
+}
+
+// Users & Roles
+enum UserRole {
+  common
+  company
+  admin
+  employee
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  passwordHash       String
+  name               String?
+  role               UserRole  @default(common)
+  companyId          Int?
+  company            Company?  @relation(fields: [companyId], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  jobApplications    JobApplication[]
+  serviceApplications ServiceApplication[]
+  jobReviews         JobReview[]
+  createdNotifications Notification[] @relation("NotificationCreatedBy")
+  notificationRecipients NotificationRecipient[]
+}
+
+// Notifications created by admins (or system) and recipients mapping
+model Notification {
+  id           Int       @id @default(autoincrement())
+  title        String
+  body         String?
+  link         String?    // optional url to open when user clicks the notification
+  createdById  Int?       // optional admin user who created the notification
+  createdBy    User?      @relation("NotificationCreatedBy", fields: [createdById], references: [id])
+  targetAll    Boolean    @default(false) // if true, intended for all users and companies
+  targetRole   UserRole?              // optional: target users with specific role (e.g., company, common)
+  sendAt       DateTime?              // scheduled send time, null => immediate
+  createdAt    DateTime   @default(now())
+  recipients   NotificationRecipient[]
+
+  @@index([createdById])
+}
+
+// Mapping table to store per-recipient delivery/read state. A recipient can be a User or a Company.
+model NotificationRecipient {
+  id             Int          @id @default(autoincrement())
+  notificationId Int
+  notification   Notification @relation(fields: [notificationId], references: [id])
+
+  // recipient can be either a user or a company (one of these will be set)
+  userId         Int?
+  user           User?        @relation(fields: [userId], references: [id])
+
+  companyId      Int?
+  company        Company?     @relation(fields: [companyId], references: [id])
+
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+
+  createdAt      DateTime     @default(now())
+
+  @@index([notificationId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+// Applications for Jobs
+enum ApplicationStatus {
+  applied
+  viewed
+  shortlisted
+  rejected
+  hired
+  withdrawn
+}
+
+model JobApplication {
+  id          Int               @id @default(autoincrement())
+  jobId       Int
+  job         Job               @relation(fields: [jobId], references: [id])
+  userId      Int
+  user        User              @relation(fields: [userId], references: [id])
+  fullName    String
+  email       String
+  cvUrl       String?
+  coverLetter String?
+  answers     Json?
+  status      ApplicationStatus @default(applied)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([jobId, userId])
+  @@index([jobId, status])
+}
+
+// Applications for Services (scholarships, procurements)
+model ServiceApplication {
+  id          Int               @id @default(autoincrement())
+  serviceId   Int
+  service     Service           @relation(fields: [serviceId], references: [id])
+  userId      Int
+  user        User              @relation(fields: [userId], references: [id])
+  fullName    String
+  email       String
+  cvUrl       String?
+  coverLetter String?
+  status      ApplicationStatus @default(applied)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([serviceId, userId])
+  @@index([serviceId, status])
+}
+
+// Flexible key/value site settings
+model Setting {
+  key       String   @id
+  value     String?
+  json      Json?
+  updatedAt DateTime @updatedAt
+}
+
+model JobReview {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  job       Job      @relation(fields: [jobId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([jobId])
+}
