@@ -7,7 +7,7 @@
 
 @base = http://localhost:4000
 @ts = {{$timestamp}}
-@token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyLCJyb2xlIjoiY29tbW9uIiwiY29tcGFueUlkIjpudWxsLCJpYXQiOjE3NTU1MDk0MjUsImV4cCI6MTc1NjExNDIyNX0.mi68xdF4so80qM_LG9nuQrEQvweFQLc3LoI06eSZweU
+@token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyLCJyb2xlIjoiY29tbW9uIiwiY29tcGFueUlkIjpudWxsLCJpYXQiOjE3NTU1MTc1MjcsImV4cCI6MTc1NjEyMjMyN30.Av6jWiK0X3DFBUQsP7saiIe0PDfpfmR6WHRbWtv81Fo
 @companyToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIsInJvbGUiOiJjb21wYW55IiwiY29tcGFueUlkIjoxLCJpYXQiOjE3NTUzMjc0NjAsImV4cCI6MTc1NTkzMjI2MH0.2vOGon_sjLNjAaKSUSyDW-S4SnPvTA7bBNJd_OmxGQ4
 # Placeholders to avoid undefined variable lint errors; these get overwritten by captures below.
 @adminUserId = 3
@@ -34,7 +34,7 @@ POST {{base}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "user1@example.com",
+  "email": "company@example.com",
   "password": "password123"
 }
 
@@ -100,7 +100,7 @@ Authorization: Bearer {{token}}
 GET {{base}}/api/jobs
 
 ### Jobs: List (default includes avgRating, reviewCount, and latest 3 reviews per job)
-GET {{base}}/api/jobs
+GET {{base}}/api/jobs/G
 
 ### Jobs: List (disable embedded reviews but keep aggregates)
 GET {{base}}/api/jobs?withReviewsCount=0
@@ -177,7 +177,7 @@ GET {{base}}/api/jobs?withReviewsCount=5
 ##############################
 
 ### Services: List
-GET {{base}}/api/services?type=scholarship&status=published&q=acme&page=1&pageSize=10
+GET {{base}}/api/services
 
 ### Services: Detail (seeded) — capture seeded service id
 GET {{base}}/api/services/acme-scholarship-2025
@@ -504,4 +504,65 @@ Authorization: Bearer {{token}}
 
 ### List Service Applications (admin)
 GET {{base}}/api/applications/services?serviceId={{seededServiceId}}&page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+##############################
+# Notifications
+##############################
+
+### Notifications: Admin create a test notification to specific user/company
+POST {{base}}/api/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "System maintenance {{ts}}",
+  "body": "We will perform maintenance tonight.",
+  "link": "https://status.example.com",
+  "targetAll": false,
+  "recipientUserIds": [{{adminUserId}}],
+  "recipientCompanyIds": [{{companyId}}]
+}
+
+### Notifications: Admin list
+GET {{base}}/api/notifications?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Notifications: My Inbox (as company user)
+GET {{base}}/api/notifications/me/inbox
+Authorization: Bearer {{companyToken}}
+
+### Notifications: Mark one as read (replace 123 with a real recipient id from inbox)
+POST {{base}}/api/notifications/me/123/read
+Authorization: Bearer {{companyToken}}
+
+##############################
+# Reviews (Job Reviews)
+##############################
+
+### Reviews: List by jobId (seeded)
+GET {{base}}/api/reviews?jobId={{seededJobId}}&page=1&pageSize=5
+
+### Reviews: Create for job (authenticated common)
+POST {{base}}/api/reviews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "jobId": {{seededJobId}},
+  "rating": 5,
+  "comment": "Great experience!"
+}
+
+### Reviews: Admin update a review (replace id 1 accordingly)
+PATCH {{base}}/api/reviews/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Updated by admin"
+}
+
+### Reviews: Admin delete a review (replace id 1 accordingly)
+DELETE {{base}}/api/reviews/1
 Authorization: Bearer {{token}}
