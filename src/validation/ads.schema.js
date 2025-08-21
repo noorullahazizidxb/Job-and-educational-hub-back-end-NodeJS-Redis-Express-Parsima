@@ -3,11 +3,17 @@ import Joi from 'joi';
 export const createAdSchema = Joi.object({
   title: Joi.string().min(2).max(200).required(),
   placement: Joi.string().valid(
-    'homepage_hero',
-    'homepage_sidebar',
-    'job_list_top',
-    'job_detail_sidebar',
-    'sitewide_banner'
+  'job_list_top',
+  'middle_of_job_list',
+  'home_page_after_pagenation_1',
+  'home_page_after_pagenation_2',
+  'middle_of_related_jobs_on_job_details',
+  'company_list_top',
+  'middle_of_company_list',
+  'middle_of_related_companies_on_company_details',
+  'service_list_top',
+  'middle_of_service_list',
+  'middle_of_related_services_on_service_details'
   ).required(),
   imageUrl: Joi.string().uri().required(),
   targetUrl: Joi.string().uri().required(),
@@ -29,11 +35,17 @@ export const updateAdSchema = createAdSchema.fork(
 
 export const listAdsQuerySchema = Joi.object({
   placement: Joi.string().valid(
-    'homepage_hero',
-    'homepage_sidebar',
-    'job_list_top',
-    'job_detail_sidebar',
-    'sitewide_banner'
+  'job_list_top',
+  'middle_of_job_list',
+  'home_page_after_pagenation_1',
+  'home_page_after_pagenation_2',
+  'middle_of_related_jobs_on_job_details',
+  'company_list_top',
+  'middle_of_company_list',
+  'middle_of_related_companies_on_company_details',
+  'service_list_top',
+  'middle_of_service_list',
+  'middle_of_related_services_on_service_details'
   ),
   activeOnly: Joi.boolean().truthy('true', '1').falsy('false', '0').default(false),
   limit: Joi.number().integer().min(1).max(50).default(10)

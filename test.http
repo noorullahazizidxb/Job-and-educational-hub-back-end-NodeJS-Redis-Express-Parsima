@@ -7,8 +7,9 @@
 
 @base = http://localhost:4000
 @ts = {{$timestamp}}
-@token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyLCJyb2xlIjoiY29tbW9uIiwiY29tcGFueUlkIjpudWxsLCJpYXQiOjE3NTU1MDk0MjUsImV4cCI6MTc1NjExNDIyNX0.mi68xdF4so80qM_LG9nuQrEQvweFQLc3LoI06eSZweU
-@companyToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIsInJvbGUiOiJjb21wYW55IiwiY29tcGFueUlkIjoxLCJpYXQiOjE3NTUzMjc0NjAsImV4cCI6MTc1NTkzMjI2MH0.2vOGon_sjLNjAaKSUSyDW-S4SnPvTA7bBNJd_OmxGQ4
+@adminToken = {{ADMIN_JWT}}
+@companyToken = {{COMPANY_JWT}}
+@commonToken = {{COMMON_JWT}}
 # Placeholders to avoid undefined variable lint errors; these get overwritten by captures below.
 @adminUserId = 3
 @companyUserId = 2
@@ -34,7 +35,7 @@ POST {{base}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "user1@example.com",
+  "email": "admin@example.com",
   "password": "password123"
 }
 
@@ -47,9 +48,18 @@ Content-Type: application/json
   "password": "password123"
 }
 
+### Auth: Common Login (captures token)
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
+  "password": "password123"
+}
+
 ### Auth: Me (admin)
 GET {{base}}/api/auth/me
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Companies
@@ -63,7 +73,7 @@ GET {{base}}/api/companies/acme-corp
 
 ### Companies: Create (admin) a QA company (captures id & slug)
 POST {{base}}/api/companies
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -81,7 +91,7 @@ Content-Type: application/json
 
 ### Companies: Update (admin) the QA company
 PATCH {{base}}/api/companies/{{qaCompanySlug}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -90,7 +100,7 @@ Content-Type: application/json
 
 ### Companies: Delete (admin) the QA company
 DELETE {{base}}/api/companies/{{qaCompanySlug}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Jobs
@@ -100,7 +110,7 @@ Authorization: Bearer {{token}}
 GET {{base}}/api/jobs
 
 ### Jobs: List (default includes avgRating, reviewCount, and latest 3 reviews per job)
-GET {{base}}/api/jobs
+GET {{base}}/api/jobs?q=G
 
 ### Jobs: List (disable embedded reviews but keep aggregates)
 GET {{base}}/api/jobs?withReviewsCount=0
@@ -148,7 +158,7 @@ Authorization: Bearer {{companyToken}}
 
 ### Jobs: Add Review to seeded job (authenticated user)
 POST {{base}}/api/jobs/frontend-developer-acme/reviews
-Authorization: Bearer {{token}}
+Authorization: Bearer {{commonToken}}
 Content-Type: application/json
 
 {
@@ -158,7 +168,7 @@ Content-Type: application/json
 
 ### Jobs: Add Review to QA job (if created) — uses captured slug
 POST {{base}}/api/jobs/{{qaJobSlug}}/reviews
-Authorization: Bearer {{token}}
+Authorization: Bearer {{commonToken}}
 Content-Type: application/json
 
 {
@@ -177,7 +187,7 @@ GET {{base}}/api/jobs?withReviewsCount=5
 ##############################
 
 ### Services: List
-GET {{base}}/api/services?type=scholarship&status=published&q=acme&page=1&pageSize=10
+GET {{base}}/api/services
 
 ### Services: Detail (seeded) — capture seeded service id
 GET {{base}}/api/services/acme-scholarship-2025
@@ -222,16 +232,16 @@ Authorization: Bearer {{companyToken}}
 ##############################
 
 ### Ads: List active for a placement (seeded)
-GET {{base}}/api/ads?placement=homepage_hero&activeOnly=true&limit=5
+GET {{base}}/api/ads?placement=home_page_after_pagenation_1&activeOnly=true&limit=5
 
 ### Ads: Create (admin) a QA ad (captures id)
 POST {{base}}/api/ads
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
   "title": "QA Ad {{ts}}",
-  "placement": "homepage_hero",
+  "placement": "job_list_top",
   "imageUrl": "https://picsum.photos/1200/400?{{ts}}",
   "targetUrl": "https://example.com/q/{{ts}}",
   "isActive": true,
@@ -241,7 +251,7 @@ Content-Type: application/json
 
 ### Ads: Update (admin) the QA ad
 PATCH {{base}}/api/ads/{{qaAdId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -250,7 +260,7 @@ Content-Type: application/json
 
 ### Ads: Delete (admin) the QA ad
 DELETE {{base}}/api/ads/{{qaAdId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Categories (Admin/Employee)
@@ -261,65 +271,65 @@ GET {{base}}/api/categories
 
 ### Categories: Create (admin) a QA category (captures id)
 POST {{base}}/api/categories
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{
+Authorization: Bearer {{adminToken}}
   "name": "QA {{ts}}",
   "slug": "qa-{{ts}}"
-}
+Authorization: Bearer {{adminToken}}
 
 
-### Categories: Detail
+Authorization: Bearer {{commonToken}}
 GET {{base}}/api/categories/{{qaCategoryId}}
 
-### Categories: Update
+Authorization: Bearer {{commonToken}}
 PATCH {{base}}/api/categories/{{qaCategoryId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{commonToken}}
 
 {
-  "name": "QA Updated {{ts}}"
+Authorization: Bearer {{adminToken}}
 }
 
-### Categories: Delete
+Authorization: Bearer {{adminToken}}
 DELETE {{base}}/api/categories/{{qaCategoryId}}
-Authorization: Bearer {{token}}
-
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken}}
 ##############################
 # Cities (Admin/Employee)
-##############################
+Authorization: Bearer {{adminToken}}
 
 ### Cities: List
-GET {{base}}/api/cities
+Authorization: Bearer {{adminToken}}
 
 ### Cities: Create (admin) a QA city (captures id)
-POST {{base}}/api/cities
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
-
+Authorization: Bearer {{adminToken}}
 {
   "name": "Testville {{ts}}",
-  "province": "Test {{ts}}",
+Authorization: Bearer {{adminToken}}
   "country": "Afghanistan"
 }
-
+Authorization: Bearer {{adminToken}}
 
 ### Cities: Detail
-GET {{base}}/api/cities/{{qaCityId}}
+Authorization: Bearer {{adminToken}}
 
 ### Cities: Update
-PATCH {{base}}/api/cities/{{qaCityId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
-
+Authorization: Bearer {{adminToken}}
 {
   "province": "Updated {{ts}}"
-}
+Authorization: Bearer {{adminToken}}
 
 ### Cities: Delete
 DELETE {{base}}/api/cities/{{qaCityId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Users (Admin/Employee)
@@ -327,7 +337,7 @@ Authorization: Bearer {{token}}
 
 ### Users: Create a common applicant user (captures id)
 POST {{base}}/api/users
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -341,15 +351,15 @@ Content-Type: application/json
 
 ### Users: List (admin)
 GET {{base}}/api/users?q=&page=1&pageSize=10
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ### Users: Detail (admin)
 GET {{base}}/api/users/{{applicantUserId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ### Users: Update (admin)
 PATCH {{base}}/api/users/{{applicantUserId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -358,7 +368,7 @@ Content-Type: application/json
 
 ### Users: Delete (admin)
 DELETE {{base}}/api/users/{{applicantUserId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Settings (Admin/Employee)
@@ -366,7 +376,7 @@ Authorization: Bearer {{token}}
 
 ### Settings: Upsert theme with full tokens JSON (admin)
 PUT {{base}}/api/settings/theme
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -424,17 +434,18 @@ GET {{base}}/api/settings/theme
 
 ### Settings: List all
 GET {{base}}/api/settings
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ##############################
 # Applications
 ##############################
 
-### Apply to the seeded Job (public) - multipart with file upload (uses repo PDFs)
+### Apply to the seeded Job (authenticated common) - multipart with file upload (uses repo PDFs)
 POST {{base}}/api/applications/jobs
+Authorization: Bearer {{commonToken}}
 Content-Type: multipart/form-data; boundary=MyBoundary
 
---MyBoundary
+Authorization: Bearer {{adminToken}}
 Content-Disposition: form-data; name="jobId"
 
 {{seededJobId}}
@@ -448,24 +459,25 @@ Content-Disposition: form-data; name="fullName"
 John Doe
 --MyBoundary
 Content-Disposition: form-data; name="email"
-
+Authorization: Bearer {{adminToken}}
 john@example.com
 --MyBoundary
 Content-Disposition: form-data; name="cv"; filename="cv.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
-< ./server/cv.pdf
+< ./cv.pdf
 --MyBoundary
-Content-Disposition: form-data; name="coverLetter"; filename="coverletter.pdf"
+Authorization: Bearer {{adminToken}}
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
-< ./server/coverletter.pdf
+< ./coverletter.pdf
 --MyBoundary--
 
-### Apply to the seeded Service (public) - multipart with file upload (uses repo PDFs)
-POST {{base}}/api/applications/services
+### Apply to the seeded Service (authenticated common) - multipart with file upload (uses repo PDFs)
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{commonToken}}
 Content-Type: multipart/form-data; boundary=MyBoundary
 
 --MyBoundary
@@ -478,30 +490,106 @@ Content-Disposition: form-data; name="userId"
 {{adminUserId}}
 --MyBoundary
 Content-Disposition: form-data; name="fullName"
-
+Authorization: Bearer {{adminToken}}
 John Doe
 --MyBoundary
 Content-Disposition: form-data; name="email"
-
+Authorization: Bearer {{companyToken}}
 john@example.com
 --MyBoundary
 Content-Disposition: form-data; name="cv"; filename="cv.pdf"
-Content-Type: application/pdf
+Authorization: Bearer {{companyToken}}
 Content-Transfer-Encoding: binary
 
-< ./server/cv.pdf
---MyBoundary
+< ./cv.pdf
+Authorization: Bearer {{adminToken}}
 Content-Disposition: form-data; name="coverLetter"; filename="coverletter.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
-< ./server/coverletter.pdf
+< ./coverletter.pdf
 --MyBoundary--
 
 ### List Job Applications (admin)
 GET {{base}}/api/applications/jobs?jobId={{seededJobId}}&page=1&pageSize=10
-Authorization: Bearer {{token}}
-
+Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{commonToken}}
 ### List Service Applications (admin)
 GET {{base}}/api/applications/services?serviceId={{seededServiceId}}&page=1&pageSize=10
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
+
+##############################
+# Notifications
+##############################
+
+### Notifications: Admin create a test notification to specific user/company
+POST {{base}}/api/notifications
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "System maintenance {{ts}}",
+  "body": "We will perform maintenance tonight.",
+  "link": "https://status.example.com",
+  "targetAll": false,
+  "recipientUserIds": [{{adminUserId}}],
+  "recipientCompanyIds": [{{companyId}}]
+}
+
+### Notifications: Admin list
+GET {{base}}/api/notifications?page=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### Notifications: My Inbox (as company user)
+GET {{base}}/api/notifications/me/inbox
+Authorization: Bearer {{companyToken}}
+
+### Notifications: Mark one as read (replace 123 with a real recipient id from inbox)
+POST {{base}}/api/notifications/me/123/read
+Authorization: Bearer {{companyToken}}
+
+### Notifications: Admin broadcast to all users (common + company)
+POST {{base}}/api/notifications
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Broadcast {{ts}}",
+  "body": "Hello everyone!",
+  "targetAll": true
+}
+
+### Notifications: My Inbox (common user)
+GET {{base}}/api/notifications/me/inbox?unreadOnly=true&page=1&pageSize=10
+Authorization: Bearer {{commonToken}}
+
+##############################
+# Reviews (Job Reviews)
+##############################
+
+### Reviews: List by jobId (seeded)
+GET {{base}}/api/reviews?jobId={{seededJobId}}&page=1&pageSize=5
+
+### Reviews: Create for job (authenticated common)
+POST {{base}}/api/reviews
+Authorization: Bearer {{commonToken}}
+Content-Type: application/json
+
+{
+  "jobId": {{seededJobId}},
+  "rating": 5,
+  "comment": "Great experience!"
+}
+
+### Reviews: Admin update a review (replace id 1 accordingly)
+PATCH {{base}}/api/reviews/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "comment": "Updated by admin"
+}
+
+### Reviews: Admin delete a review (replace id 1 accordingly)
+DELETE {{base}}/api/reviews/1
+Authorization: Bearer {{adminToken}}

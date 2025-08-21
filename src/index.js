@@ -15,6 +15,9 @@ import applicationsRouter from './routes/applications.js';
 import settingsRouter from './routes/settings.js';
 import { authenticate } from './middleware/authn.js';
 import authRouter from './routes/auth.js';
+import notificationsRouter from './routes/notifications.js';
+import reviewsRouter from './routes/reviews.js';
+import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
 
 const app = express();
 
@@ -23,6 +26,7 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(authenticate);
+app.use(responseEnvelope());
 // static files for uploads
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
@@ -37,17 +41,23 @@ app.use('/api/ads', adsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/reviews', reviewsRouter);
 
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   console.error(err);
   // Normalize Joi validation errors to message only
   if (err && err.isJoi) {
     const message = err.message || 'Invalid request data';
-    return res.status(400).json({ message });
+    const entity = req?.entity || getEntityFromRequest(req) || 'unknown';
+    const fullMsg = entity && entity !== 'unknown' ? `${entity} ${message}` : message;
+    return res.status(400).json({ success: false, status: 400, entity, message: fullMsg });
   }
   const status = err.status || 500;
   const message = err.message || 'Internal Server Error';
-  res.status(status).json({ message });
+  const entity = req?.entity || getEntityFromRequest(req) || 'unknown';
+  const fullMsg = entity && entity !== 'unknown' ? `${entity} ${message}` : message;
+  res.status(status).json({ success: false, status, entity, message: fullMsg });
 });
 
 const PORT = process.env.PORT || 4000;

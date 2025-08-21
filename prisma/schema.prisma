@@ -159,11 +159,17 @@ model Advertisement {
 }
 
 enum AdPlacement {
-  homepage_hero
-  homepage_sidebar
   job_list_top
-  job_detail_sidebar
-  sitewide_banner
+  middle_of_job_list
+  home_page_after_pagenation_1
+  home_page_after_pagenation_2
+  middle_of_related_jobs_on_job_details
+  company_list_top
+  middle_of_company_list
+  middle_of_related_companies_on_company_details
+  service_list_top
+  middle_of_service_list
+  middle_of_related_services_on_service_details
 }
 
 // Services such as Procurement Opportunities and Scholarships
@@ -270,6 +276,8 @@ model NotificationRecipient {
   @@index([notificationId])
   @@index([userId])
   @@index([companyId])
+  @@unique([notificationId, userId])
+  @@unique([notificationId, companyId])
 }
 
 // Applications for Jobs

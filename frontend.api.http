@@ -105,11 +105,11 @@ Content-Type: application/json
 ##############################
 # Ads (Public)
 ##############################
-# Get active banner for a placement (e.g., homepage hero, sitewide banner)
-GET {{base}}/api/ads?placement=sitewide_banner&activeOnly=true&limit=1
+# Get active banner for a placement (e.g., homepage lists)
+GET {{base}}/api/ads?placement=home_page_after_pagenation_1&activeOnly=true&limit=1
 
-# Other placements: homepage_hero | homepage_sidebar | job_list_top | job_detail_sidebar
-GET {{base}}/api/ads?placement=homepage_hero&activeOnly=true&limit=5
+# Other placements: job_list_top | middle_of_job_list | home_page_after_pagenation_2 | middle_of_related_jobs_on_job_details
+GET {{base}}/api/ads?placement=job_list_top&activeOnly=true&limit=5
 
 ##############################
 # Jobs (Public)

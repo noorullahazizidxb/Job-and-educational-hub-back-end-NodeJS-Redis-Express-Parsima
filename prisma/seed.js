@@ -396,35 +396,73 @@ async function main() {
     }
   }
 
-  // Seed Notifications (ensure at least 10 notifications and recipients)
+  // Seed Notifications: broadcast to all common users, broadcast to all company users, and specific recipients
   const adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
-  const allUserRows = await prisma.user.findMany({ take: 20 });
-  const allCompanyRows = await prisma.company.findMany({ take: 20 });
-  for (let n = 1; n <= 10; n++) {
-    try {
-      const notif = await prisma.notification.create({
-        data: {
-          title: `Seed Notification ${n}`,
-          body: `This is seeded notification number ${n}`,
-          link: n % 2 === 0 ? `https://example.com/notice/${n}` : null,
-          createdById: adminUser?.id || null,
-          targetAll: false,
-          targetRole: null,
-        },
+  const commonUsers = await prisma.user.findMany({ where: { role: 'common' }, take: 50 });
+  const companyUsers = await prisma.user.findMany({ where: { role: 'company' }, take: 50 });
+  const someSpecificUsers = [commonUsers[0], commonUsers[1], companyUsers[0]].filter(Boolean);
+  const someCompanies = await prisma.company.findMany({ take: 3 });
+
+  // 1) Broadcast to all common users
+  try {
+    const notifCommon = await prisma.notification.create({
+      data: {
+        title: 'Welcome commons',
+        body: 'Hello common users — this is a broadcast message.',
+        link: null,
+        createdById: adminUser?.id || null,
+        targetAll: false,
+        targetRole: 'common',
+      },
+    });
+    if (commonUsers.length) {
+      await prisma.notificationRecipient.createMany({
+        data: commonUsers.map((u) => ({ notificationId: notifCommon.id, userId: u.id })),
+        skipDuplicates: true,
       });
-      // create 1-3 recipients per notification (mix users and companies)
-      const recipCount = 1 + (n % 3);
-      for (let r = 0; r < recipCount; r++) {
-        if (r % 2 === 0 && allUserRows[r]) {
-          await prisma.notificationRecipient.create({ data: { notificationId: notif.id, userId: allUserRows[r].id } });
-        } else if (allCompanyRows[r]) {
-          await prisma.notificationRecipient.create({ data: { notificationId: notif.id, companyId: allCompanyRows[r].id } });
-        }
-      }
-    } catch (err) {
-      // ignore
     }
-  }
+  } catch {}
+
+  // 2) Broadcast to all company users
+  try {
+    const notifCompany = await prisma.notification.create({
+      data: {
+        title: 'Welcome companies',
+        body: 'Hello company users — important update for organizations.',
+        link: null,
+        createdById: adminUser?.id || null,
+        targetAll: false,
+        targetRole: 'company',
+      },
+    });
+    if (companyUsers.length) {
+      await prisma.notificationRecipient.createMany({
+        data: companyUsers.map((u) => ({ notificationId: notifCompany.id, userId: u.id })),
+        skipDuplicates: true,
+      });
+    }
+  } catch {}
+
+  // 3) Specific recipients: chosen users and companies
+  try {
+    const notifSpecific = await prisma.notification.create({
+      data: {
+        title: 'Direct message',
+        body: 'This notification was sent to specific recipients only.',
+        link: 'https://example.com/special',
+        createdById: adminUser?.id || null,
+        targetAll: false,
+        targetRole: null,
+      },
+    });
+    const creates = [
+      ...someSpecificUsers.map((u) => ({ notificationId: notifSpecific.id, userId: u.id })),
+      ...someCompanies.map((c) => ({ notificationId: notifSpecific.id, companyId: c.id })),
+    ];
+    if (creates.length) {
+      await prisma.notificationRecipient.createMany({ data: creates, skipDuplicates: true });
+    }
+  } catch {}
 
   // Seed at least 10 services
   const service = await prisma.service.upsert({
@@ -473,7 +511,7 @@ async function main() {
     update: { title: 'Homepage Hero Banner' },
     create: {
       title: 'Homepage Hero Banner',
-      placement: 'homepage_hero',
+      placement: 'home_page_after_pagenation_1',
       imageUrl: 'https://picsum.photos/1200/400',
       targetUrl: 'https://example.com',
       isActive: true,
@@ -486,7 +524,7 @@ async function main() {
       update: { title: `Ad ${i}` },
       create: {
         title: `Ad ${i}`,
-        placement: i % 2 === 0 ? 'homepage_sidebar' : 'job_list_top',
+        placement: i % 2 === 0 ? 'home_page_after_pagenation_2' : 'job_list_top',
         imageUrl: `https://picsum.photos/seed/${i}/600/200`,
         targetUrl: 'https://example.com',
         isActive: i % 3 !== 0,
