@@ -15,6 +15,42 @@ export async function list(req, res, next) {
       prisma.user.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' }, include: { company: true } }),
       prisma.user.count({ where }),
     ]);
+
+    // For users with role 'common', include their job and service applications
+    const commonIds = items.filter((u) => u.role === 'common').map((u) => u.id);
+    if (commonIds.length) {
+      const [jobApps, serviceApps] = await Promise.all([
+        prisma.jobApplication.findMany({
+          where: { userId: { in: commonIds } },
+          orderBy: { createdAt: 'desc' },
+          include: { job: true },
+        }),
+        prisma.serviceApplication.findMany({
+          where: { userId: { in: commonIds } },
+          orderBy: { createdAt: 'desc' },
+          include: { service: true },
+        }),
+      ]);
+      const jaByUser = new Map();
+      for (const a of jobApps) {
+        const arr = jaByUser.get(a.userId) || [];
+        arr.push(a);
+        jaByUser.set(a.userId, arr);
+      }
+      const saByUser = new Map();
+      for (const a of serviceApps) {
+        const arr = saByUser.get(a.userId) || [];
+        arr.push(a);
+        saByUser.set(a.userId, arr);
+      }
+      for (const u of items) {
+        if (u.role === 'common') {
+          u.jobApplications = jaByUser.get(u.id) || [];
+          u.serviceApplications = saByUser.get(u.id) || [];
+        }
+      }
+    }
+
     res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
   } catch (err) { next(err); }
 }
@@ -22,8 +58,18 @@ export async function list(req, res, next) {
 export async function detail(req, res, next) {
   try {
     const { id } = req.params;
-  const item = await prisma.user.findUnique({ where: { id: Number(id) }, include: { company: true } });
-  if (!item) return next(notFound());
+    const userId = Number(id);
+    const item = await prisma.user.findUnique({ where: { id: userId }, include: { company: true } });
+    if (!item) return next(notFound());
+
+    if (item.role === 'common') {
+      const [jobApplications, serviceApplications] = await Promise.all([
+        prisma.jobApplication.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, include: { job: true } }),
+        prisma.serviceApplication.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, include: { service: true } }),
+      ]);
+      item.jobApplications = jobApplications;
+      item.serviceApplications = serviceApplications;
+    }
     res.json(item);
   } catch (err) { next(err); }
 }

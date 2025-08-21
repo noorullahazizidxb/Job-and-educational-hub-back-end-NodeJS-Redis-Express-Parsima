@@ -7,11 +7,11 @@
 
 @base = http://localhost:4000
 @ts = {{$timestamp}}
-@adminToken = {{ADMIN_JWT}}
-@companyToken = {{COMPANY_JWT}}
-@commonToken = {{COMMON_JWT}}
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzU1NzQ5ODAyLCJleHAiOjE3NTYzNTQ2MDJ9.yxQnDa9NT6BbvZ045QrG6Buf2aoVNWMgtArLqfUqAww
+@companyToken = 
+@commonToken = 
 # Placeholders to avoid undefined variable lint errors; these get overwritten by captures below.
-@adminUserId = 3
+@adminUserId = 1
 @companyUserId = 2
 @companyId = 1
 @qaCompanyId = 2
@@ -23,14 +23,14 @@
 @qaAdId = 2
 @qaCategoryId = 6
 @qaCityId = 4
-@applicantUserId = 3
-@seededJobId = 1
+@applicantUserId = 12
+@seededJobId = 2
 @seededServiceId = 1
 
 ### Health
 GET {{base}}/health
 
-### Auth: Admin Login (captures token and user)
+### Auth: Admin Login (captures adminToken and adminUserId)
 POST {{base}}/api/auth/login
 Content-Type: application/json
 
@@ -39,16 +39,7 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### Auth: Company Login (captures token, userId, companyId)
-POST {{base}}/api/auth/login
-Content-Type: application/json
-
-{
-  "email": "company@example.com",
-  "password": "password123"
-}
-
-### Auth: Common Login (captures token)
+### Auth: Common Login (captures commonToken and applicantUserId)
 POST {{base}}/api/auth/login
 Content-Type: application/json
 
@@ -57,9 +48,44 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### Auth: Me (admin)
+> {% 
+if (response.body && response.body.token) {
+  client.global.set("commonToken", response.body.token);
+}
+if (response.body && response.body.user) {
+  client.global.set("applicantUserId", String(response.body.user.id));
+}
+%}
+
+### Auth: Company Login (captures companyToken, userId, companyId)
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "company@example.com",
+  "password": "password123"
+}
+
+> {% 
+if (response.body && response.body.token) {
+  client.global.set("companyToken", response.body.token);
+}
+if (response.body && response.body.user) {
+  client.global.set("companyUserId", String(response.body.user.id));
+  if (response.body.user.companyId) client.global.set("companyId", String(response.body.user.companyId));
+}
+%}
+
+### Auth: Me (common)
 GET {{base}}/api/auth/me
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{commonToken}}
+
+> {% 
+// Capture the logged-in user's id for use in applications
+if (response.body && response.body.user) {
+  client.global.set("applicantUserId", String(response.body.user.id));
+}
+%}
 
 ##############################
 # Companies
@@ -110,7 +136,7 @@ Authorization: Bearer {{adminToken}}
 GET {{base}}/api/jobs
 
 ### Jobs: List (default includes avgRating, reviewCount, and latest 3 reviews per job)
-GET {{base}}/api/jobs?q=G
+GET {{base}}/api/jobs/G
 
 ### Jobs: List (disable embedded reviews but keep aggregates)
 GET {{base}}/api/jobs?withReviewsCount=0
@@ -121,6 +147,13 @@ GET {{base}}/api/jobs?withReviewsCount=2
 
 ### Jobs: Detail (seeded) — capture seeded job id
 GET {{base}}/api/jobs/frontend-developer-acme
+
+> {% 
+// Capture the seeded job id
+if (response.body && response.body.id) {
+  client.global.set("seededJobId", String(response.body.id));
+}
+%}
 
 
 ### Jobs: Create (company) a QA job (captures slug & id)
@@ -191,6 +224,13 @@ GET {{base}}/api/services
 
 ### Services: Detail (seeded) — capture seeded service id
 GET {{base}}/api/services/acme-scholarship-2025
+
+> {% 
+// Capture the seeded service id
+if (response.body && response.body.id) {
+  client.global.set("seededServiceId", String(response.body.id));
+}
+%}
 
 
 ### Services: Create (company) a QA service
@@ -274,58 +314,58 @@ POST {{base}}/api/categories
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-Authorization: Bearer {{adminToken}}
+{
   "name": "QA {{ts}}",
   "slug": "qa-{{ts}}"
-Authorization: Bearer {{adminToken}}
+}
 
 
-Authorization: Bearer {{commonToken}}
+### Categories: Detail
 GET {{base}}/api/categories/{{qaCategoryId}}
 
-Authorization: Bearer {{commonToken}}
+### Categories: Update
 PATCH {{base}}/api/categories/{{qaCategoryId}}
 Authorization: Bearer {{adminToken}}
-Authorization: Bearer {{commonToken}}
+Content-Type: application/json
 
 {
-Authorization: Bearer {{adminToken}}
+  "name": "QA Updated {{ts}}"
 }
 
-Authorization: Bearer {{adminToken}}
+### Categories: Delete
 DELETE {{base}}/api/categories/{{qaCategoryId}}
 Authorization: Bearer {{adminToken}}
-Authorization: Bearer {{adminToken}}
+
 ##############################
 # Cities (Admin/Employee)
-Authorization: Bearer {{adminToken}}
+##############################
 
 ### Cities: List
-Authorization: Bearer {{adminToken}}
+GET {{base}}/api/cities
 
 ### Cities: Create (admin) a QA city (captures id)
-Authorization: Bearer {{adminToken}}
+POST {{base}}/api/cities
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
-Authorization: Bearer {{adminToken}}
+
 {
   "name": "Testville {{ts}}",
-Authorization: Bearer {{adminToken}}
+  "province": "Test {{ts}}",
   "country": "Afghanistan"
 }
-Authorization: Bearer {{adminToken}}
+
 
 ### Cities: Detail
-Authorization: Bearer {{adminToken}}
+GET {{base}}/api/cities/{{qaCityId}}
 
 ### Cities: Update
-Authorization: Bearer {{adminToken}}
+PATCH {{base}}/api/cities/{{qaCityId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
-Authorization: Bearer {{adminToken}}
+
 {
   "province": "Updated {{ts}}"
-Authorization: Bearer {{adminToken}}
+}
 
 ### Cities: Delete
 DELETE {{base}}/api/cities/{{qaCityId}}
@@ -350,7 +390,7 @@ Content-Type: application/json
 
 
 ### Users: List (admin)
-GET {{base}}/api/users?q=&page=1&pageSize=10
+GET {{base}}/api/users?q=&page=1&pageSize=50
 Authorization: Bearer {{adminToken}}
 
 ### Users: Detail (admin)
@@ -440,26 +480,38 @@ Authorization: Bearer {{adminToken}}
 # Applications
 ##############################
 
+##############################
+# Maintenance (Admin/Employee)
+##############################
+
+### Cleanup expired items (dry-run)
+POST {{base}}/api/maintenance/cleanup-expired?dryRun=true
+Authorization: Bearer {{adminToken}}
+
+### Cleanup expired items before a date (live)
+POST {{base}}/api/maintenance/cleanup-expired?before=2030-01-01T00:00:00.000Z
+Authorization: Bearer {{adminToken}}
+
 ### Apply to the seeded Job (authenticated common) - multipart with file upload (uses repo PDFs)
 POST {{base}}/api/applications/jobs
 Authorization: Bearer {{commonToken}}
 Content-Type: multipart/form-data; boundary=MyBoundary
 
-Authorization: Bearer {{adminToken}}
+--MyBoundary
 Content-Disposition: form-data; name="jobId"
 
 {{seededJobId}}
 --MyBoundary
 Content-Disposition: form-data; name="userId"
 
-{{adminUserId}}
+{{applicantUserId}}
 --MyBoundary
 Content-Disposition: form-data; name="fullName"
 
 John Doe
 --MyBoundary
 Content-Disposition: form-data; name="email"
-Authorization: Bearer {{adminToken}}
+
 john@example.com
 --MyBoundary
 Content-Disposition: form-data; name="cv"; filename="cv.pdf"
@@ -468,7 +520,7 @@ Content-Transfer-Encoding: binary
 
 < ./cv.pdf
 --MyBoundary
-Authorization: Bearer {{adminToken}}
+Content-Disposition: form-data; name="coverLetter"; filename="coverletter.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
@@ -476,7 +528,7 @@ Content-Transfer-Encoding: binary
 --MyBoundary--
 
 ### Apply to the seeded Service (authenticated common) - multipart with file upload (uses repo PDFs)
-Authorization: Bearer {{adminToken}}
+POST {{base}}/api/applications/services
 Authorization: Bearer {{commonToken}}
 Content-Type: multipart/form-data; boundary=MyBoundary
 
@@ -487,22 +539,22 @@ Content-Disposition: form-data; name="serviceId"
 --MyBoundary
 Content-Disposition: form-data; name="userId"
 
-{{adminUserId}}
+{{applicantUserId}}
 --MyBoundary
 Content-Disposition: form-data; name="fullName"
-Authorization: Bearer {{adminToken}}
+
 John Doe
 --MyBoundary
 Content-Disposition: form-data; name="email"
-Authorization: Bearer {{companyToken}}
+
 john@example.com
 --MyBoundary
 Content-Disposition: form-data; name="cv"; filename="cv.pdf"
-Authorization: Bearer {{companyToken}}
+Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
 < ./cv.pdf
-Authorization: Bearer {{adminToken}}
+--MyBoundary
 Content-Disposition: form-data; name="coverLetter"; filename="coverletter.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
@@ -513,7 +565,7 @@ Content-Transfer-Encoding: binary
 ### List Job Applications (admin)
 GET {{base}}/api/applications/jobs?jobId={{seededJobId}}&page=1&pageSize=10
 Authorization: Bearer {{adminToken}}
-Authorization: Bearer {{commonToken}}
+
 ### List Service Applications (admin)
 GET {{base}}/api/applications/services?serviceId={{seededServiceId}}&page=1&pageSize=10
 Authorization: Bearer {{adminToken}}

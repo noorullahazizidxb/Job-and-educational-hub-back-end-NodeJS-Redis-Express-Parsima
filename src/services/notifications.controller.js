@@ -6,10 +6,37 @@ export async function list(req, res, next) {
     const { q, page = 1, pageSize = 20 } = req.query;
     const where = q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : {};
     const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.notification.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' } }),
+    const [rows, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        skip,
+        take: Number(pageSize),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: true,
+          recipients: {
+            include: {
+              user: true,
+              company: true,
+            },
+          },
+        },
+      }),
       prisma.notification.count({ where }),
     ]);
+
+    const items = rows.map((n) => ({
+      ...n,
+      // computed type for convenience: broadcast_all | role_<role> | direct
+      type: n.targetAll ? 'broadcast_all' : (n.targetRole ? `role_${n.targetRole}` : 'direct'),
+      recipients: (n.recipients || []).map((r) => ({
+        ...r,
+        type: r.userId ? 'user' : 'company',
+        userName: r.user ? (r.user.name || null) : (r.company ? r.company.name : null),
+        userEmail: r.user ? r.user.email : null,
+      })),
+    }));
+
     res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
   } catch (err) { next(err); }
 }
@@ -17,8 +44,24 @@ export async function list(req, res, next) {
 export async function detail(req, res, next) {
   try {
     const { id } = req.params;
-    const item = await prisma.notification.findUnique({ where: { id: Number(id) }, include: { recipients: true } });
-    if (!item) return next(notFound());
+    const n = await prisma.notification.findUnique({
+      where: { id: Number(id) },
+      include: {
+        createdBy: true,
+        recipients: { include: { user: true, company: true } },
+      },
+    });
+    if (!n) return next(notFound());
+    const item = {
+      ...n,
+      type: n.targetAll ? 'broadcast_all' : (n.targetRole ? `role_${n.targetRole}` : 'direct'),
+      recipients: (n.recipients || []).map((r) => ({
+        ...r,
+        type: r.userId ? 'user' : 'company',
+        userName: r.user ? (r.user.name || null) : (r.company ? r.company.name : null),
+        userEmail: r.user ? r.user.email : null,
+      })),
+    };
     res.json(item);
   } catch (err) { next(err); }
 }
@@ -113,16 +156,32 @@ export async function myInbox(req, res, next) {
     };
 
     const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       prisma.notificationRecipient.findMany({
         where,
         skip,
         take: Number(pageSize),
         orderBy: { createdAt: 'desc' },
-        include: { notification: true },
+        include: {
+          user: true,
+          company: true,
+          notification: { include: { createdBy: true } },
+        },
       }),
       prisma.notificationRecipient.count({ where }),
     ]);
+
+    const items = rows.map((r) => ({
+      ...r,
+      type: r.userId ? 'user' : 'company',
+      userName: r.user ? (r.user.name || null) : (r.company ? r.company.name : null),
+      userEmail: r.user ? r.user.email : null,
+      notification: {
+        ...r.notification,
+        type: r.notification.targetAll ? 'broadcast_all' : (r.notification.targetRole ? `role_${r.notification.targetRole}` : 'direct'),
+      },
+    }));
+
     res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
   } catch (err) { next(err); }
 }

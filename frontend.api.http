@@ -7,6 +7,7 @@
 # Optional JWTs for protected endpoints (admin/company)
 @adminToken = {{ADMIN_JWT}}
 @companyToken = {{COMPANY_JWT}}
+@commonToken = {{COMMON_JWT}}
 
 ##############################
 # Health
@@ -22,6 +23,15 @@ Content-Type: application/json
 
 {
   "email": "admin@example.com",
+  "password": "password123"
+}
+
+# Login as a common user for applications (copy token to {{commonToken}})
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
   "password": "password123"
 }
 
@@ -145,11 +155,13 @@ GET {{base}}/api/categories
 GET {{base}}/api/cities
 
 ##############################
-# Applications (Public)
+# Applications (Authenticated - common user)
 ##############################
 # Apply to a job (multipart/form-data)
 # Fields: jobId, userId, fullName, email, cv (file), coverLetter (file)
+# Tip: Get a job ID from GET /api/jobs/frontend-developer-acme, and use the logged-in common user's ID
 POST {{base}}/api/applications/jobs
+Authorization: Bearer {{commonToken}}
 Content-Type: multipart/form-data; boundary=MyBoundary
 
 --MyBoundary
@@ -173,13 +185,13 @@ Content-Disposition: form-data; name="cv"; filename="cv.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
-< ./server/cv.pdf
+< ./cv.pdf
 --MyBoundary
 Content-Disposition: form-data; name="coverLetter"; filename="coverletter.pdf"
 Content-Type: application/pdf
 Content-Transfer-Encoding: binary
 
-< ./server/coverletter.pdf
+< ./coverletter.pdf
 --MyBoundary--
 
 ##############################
