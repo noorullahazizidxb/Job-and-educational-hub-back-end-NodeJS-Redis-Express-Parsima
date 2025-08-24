@@ -272,7 +272,7 @@ Authorization: Bearer {{companyToken}}
 ##############################
 
 ### Ads: List active for a placement (seeded)
-GET {{base}}/api/ads?placement=home_page_after_pagenation_1&activeOnly=true&limit=5
+GET {{base}}/api/ads
 
 ### Ads: Create (admin) a QA ad (captures id)
 POST {{base}}/api/ads
@@ -295,7 +295,7 @@ Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
-  "priority": 9
+  "isActive": false
 }
 
 ### Ads: Delete (admin) the QA ad
