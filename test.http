@@ -7,7 +7,7 @@
 
 @base = http://localhost:4000
 @ts = {{$timestamp}}
-@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzU1NzQ5ODAyLCJleHAiOjE3NTYzNTQ2MDJ9.yxQnDa9NT6BbvZ045QrG6Buf2aoVNWMgtArLqfUqAww
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzU1OTI2NDk0LCJleHAiOjE3NTY1MzEyOTR9.LiqzygSBscJ_WMgyuauNsWCBHSMnT_4MH8gsjX1gPvw
 @companyToken = 
 @commonToken = 
 # Placeholders to avoid undefined variable lint errors; these get overwritten by captures below.
@@ -136,7 +136,7 @@ Authorization: Bearer {{adminToken}}
 GET {{base}}/api/jobs
 
 ### Jobs: List (default includes avgRating, reviewCount, and latest 3 reviews per job)
-GET {{base}}/api/jobs/G
+GET {{base}}/api/jobs/frontend-developer-acme
 
 ### Jobs: List (disable embedded reviews but keep aggregates)
 GET {{base}}/api/jobs?withReviewsCount=0
@@ -154,6 +154,11 @@ if (response.body && response.body.id) {
   client.global.set("seededJobId", String(response.body.id));
 }
 %}
+
+
+### Jobs: List by companyId (company)
+GET {{base}}/api/jobs/by-company/{{companyId}}
+Authorization: Bearer {{companyToken}}
 
 
 ### Jobs: Create (company) a QA job (captures slug & id)
@@ -254,6 +259,73 @@ Content-Type: application/json
 }
 
 
+### Services: Create (company) with documents (multipart)
+POST {{base}}/api/services
+Authorization: Bearer {{companyToken} }
+Content-Type: multipart/form-data; boundary=MyBoundary
+
+--MyBoundary
+Content-Disposition: form-data; name="type"
+
+scholarship
+--MyBoundary
+Content-Disposition: form-data; name="title"
+
+QA Scholarship {{ts}}
+--MyBoundary
+Content-Disposition: form-data; name="slug"
+
+qa-scholarship-{{ts}}
+--MyBoundary
+Content-Disposition: form-data; name="description"
+
+Scholarship created by REST tests (multipart)
+--MyBoundary
+Content-Disposition: form-data; name="organization"
+
+QA Foundation
+--MyBoundary
+Content-Disposition: form-data; name="companyId"
+
+{{companyId}}
+--MyBoundary
+Content-Disposition: form-data; name="country"
+
+Afghanistan
+--MyBoundary
+Content-Disposition: form-data; name="category"
+
+QA
+--MyBoundary
+Content-Disposition: form-data; name="tags"
+
+scholarship,testing
+--MyBoundary
+Content-Disposition: form-data; name="eligibility"
+
+Undergrad
+--MyBoundary
+Content-Disposition: form-data; name="applyUrl"
+
+https://example.com/apply/{{ts}}
+--MyBoundary
+Content-Disposition: form-data; name="status"
+
+published
+--MyBoundary
+Content-Disposition: form-data; name="documents"; filename="cv.pdf"
+Content-Type: application/pdf
+Content-Transfer-Encoding: binary
+
+< ./cv.pdf
+--MyBoundary
+Content-Disposition: form-data; name="documents"; filename="coverletter.pdf"
+Content-Type: application/pdf
+Content-Transfer-Encoding: binary
+
+< ./coverletter.pdf
+--MyBoundary--
+
 ### Services: Update (company) the QA service
 PATCH {{base}}/api/services/{{qaServiceSlug}}
 Authorization: Bearer {{companyToken}}
@@ -266,6 +338,24 @@ Content-Type: application/json
 ### Services: Delete (company) the QA service
 DELETE {{base}}/api/services/{{qaServiceSlug}}
 Authorization: Bearer {{companyToken}}
+
+
+### Services: Update (company) with documents (multipart)
+PATCH {{base}}/api/services/{{qaServiceSlug}}
+Authorization: Bearer {{companyToken}}
+Content-Type: multipart/form-data; boundary=MyBoundary
+
+--MyBoundary
+Content-Disposition: form-data; name="featured"
+
+true
+--MyBoundary
+Content-Disposition: form-data; name="documents"; filename="cv.pdf"
+Content-Type: application/pdf
+Content-Transfer-Encoding: binary
+
+< ./cv.pdf
+--MyBoundary--
 
 ##############################
 # Advertisements (Admin/Employee)

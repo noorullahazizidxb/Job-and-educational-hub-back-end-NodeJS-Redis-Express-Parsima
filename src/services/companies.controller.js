@@ -12,25 +12,15 @@ function toSlug(name) {
 
 export async function list(req, res, next) {
   try {
-    const { q, cityId, page = 1, pageSize = 20 } = req.query;
-    const where = {
+  const { q, cityId } = req.query;
+  const where = {
       AND: [
         q ? { OR: [{ name: { contains: q } }, { industry: { contains: q } }, { about: { contains: q } }, { description: { contains: q } }] } : {},
         cityId ? { cityId: Number(cityId) } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.company.findMany({
-        where,
-        skip,
-        take: Number(pageSize),
-        orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { jobs: true, users: true } }, city: true },
-      }),
-      prisma.company.count({ where }),
-    ]);
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+  const items = await prisma.company.findMany({ where, orderBy: { createdAt: 'desc' }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
+  res.json(items);
   } catch (err) { next(err); }
 }
 

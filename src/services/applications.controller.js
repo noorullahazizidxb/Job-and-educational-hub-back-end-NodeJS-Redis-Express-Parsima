@@ -23,20 +23,16 @@ export async function applyToJob(req, res, next) {
 
 export async function listJobApplications(req, res, next) {
   try {
-    const { jobId, userId, status, page = 1, pageSize = 20 } = req.query;
-    const where = {
+  const { jobId, userId, status } = req.query;
+  const where = {
       AND: [
         jobId ? { jobId: Number(jobId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.jobApplication.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' }, include: { job: true, user: true } }),
-      prisma.jobApplication.count({ where }),
-    ]);
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+  const items = await prisma.jobApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { job: true, user: true } });
+  res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -65,19 +61,15 @@ function tryParseJSON(s) {
 
 export async function listServiceApplications(req, res, next) {
   try {
-    const { serviceId, userId, status, page = 1, pageSize = 20 } = req.query;
-    const where = {
+  const { serviceId, userId, status } = req.query;
+  const where = {
       AND: [
         serviceId ? { serviceId: Number(serviceId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.serviceApplication.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' }, include: { service: true, user: true } }),
-      prisma.serviceApplication.count({ where }),
-    ]);
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+  const items = await prisma.serviceApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { service: true, user: true } });
+  res.json(items);
   } catch (err) { next(err); }
 }

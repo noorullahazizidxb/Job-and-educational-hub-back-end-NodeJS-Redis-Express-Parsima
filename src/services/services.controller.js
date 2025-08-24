@@ -1,9 +1,21 @@
+// List services by companyId
+export async function listByCompany(req, res, next) {
+  try {
+    const { companyId } = req.params;
+    const items = await prisma.service.findMany({
+      where: { companyId: Number(companyId) },
+      orderBy: { postedAt: 'desc' },
+      include: { company: true, city: true },
+    });
+  res.json(items);
+  } catch (err) { next(err); }
+}
 import { prisma } from '../lib/prisma.js';
 import { notFound } from '../utils/httpError.js';
 
 export async function list(req, res, next) {
   try {
-    const { q, type, status, cityId, page = 1, pageSize = 20 } = req.query;
+    const { q, type, status, cityId } = req.query;
     const where = {
       AND: [
         q ? { OR: [ { title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } } ] } : {},
@@ -12,12 +24,9 @@ export async function list(req, res, next) {
         cityId ? { cityId: Number(cityId) } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.service.findMany({ where, skip, take: Number(pageSize), orderBy: { postedAt: 'desc' }, include: { company: true, city: true } }),
-      prisma.service.count({ where }),
-    ]);
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+
+    const items = await prisma.service.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true } });
+    res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -32,7 +41,13 @@ export async function detail(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const data = req.body;
+    const files = req.files || [];
+    const body = req.body || {};
+    const data = { ...body };
+    if (files && files.length) {
+      // store file paths under documents as array of URLs
+      data.documents = files.map((f) => `/uploads/services/${f.filename}`);
+    }
     const item = await prisma.service.create({ data });
     res.status(201).json(item);
   } catch (err) { next(err); }
@@ -41,7 +56,13 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const { slug } = req.params;
-    const item = await prisma.service.update({ where: { slug }, data: req.body });
+    const files = req.files || [];
+    const body = req.body || {};
+    const data = { ...body };
+    if (files && files.length) {
+      data.documents = files.map((f) => `/uploads/services/${f.filename}`);
+    }
+    const item = await prisma.service.update({ where: { slug }, data });
     res.json(item);
   } catch (err) { next(err); }
 }

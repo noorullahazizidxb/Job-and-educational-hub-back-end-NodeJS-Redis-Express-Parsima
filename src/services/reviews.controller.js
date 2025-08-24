@@ -3,14 +3,10 @@ import { httpError, notFound, unauthorized } from '../utils/httpError.js';
 
 export async function list(req, res, next) {
   try {
-    const { jobId, page = 1, pageSize = 20 } = req.query;
+    const { jobId } = req.query;
     const where = { jobId: jobId ? Number(jobId) : undefined };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.jobReview.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, name: true } } } }),
-      prisma.jobReview.count({ where }),
-    ]);
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+    const items = await prisma.jobReview.findMany({ where, orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, name: true } } } });
+    res.json(items);
   } catch (err) { next(err); }
 }
 

@@ -3,18 +3,14 @@ import { notFound } from '../utils/httpError.js';
 
 export async function list(req, res, next) {
   try {
-    const { q, role, page = 1, pageSize = 20 } = req.query;
-    const where = {
+  const { q, role } = req.query;
+  const where = {
       AND: [
         q ? { OR: [{ name: { contains: q } }, { email: { contains: q } }] } : {},
         role ? { role } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.user.findMany({ where, skip, take: Number(pageSize), orderBy: { createdAt: 'desc' }, include: { company: true } }),
-      prisma.user.count({ where }),
-    ]);
+  const items = await prisma.user.findMany({ where, orderBy: { createdAt: 'desc' }, include: { company: true } });
 
     // For users with role 'common', include their job and service applications
     const commonIds = items.filter((u) => u.role === 'common').map((u) => u.id);
@@ -51,7 +47,7 @@ export async function list(req, res, next) {
       }
     }
 
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+  res.json(items);
   } catch (err) { next(err); }
 }
 

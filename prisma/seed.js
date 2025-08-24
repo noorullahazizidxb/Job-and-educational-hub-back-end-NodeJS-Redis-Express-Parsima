@@ -601,6 +601,166 @@ async function main() {
       });
     }
   }
+
+  // --- Ensure larger dataset: at least 50 of companies, users, jobs, services, and applications ---
+  const TARGET = 50;
+
+  // Refresh lists
+  let allCompanies = await prisma.company.findMany({ orderBy: { id: 'asc' } });
+  let allUsers = await prisma.user.findMany({ orderBy: { id: 'asc' } });
+  let allJobs = await prisma.job.findMany({ orderBy: { id: 'asc' } });
+  let allServices = await prisma.service.findMany({ orderBy: { id: 'asc' } });
+
+  // Create companies until TARGET
+  let createdCompanies = 0;
+  while (allCompanies.length < TARGET) {
+    const i = allCompanies.length + 1;
+    const name = `Seed Company ${i}`;
+    const slug = toSlug(`${name}-${i}-${Date.now().toString().slice(-4)}`);
+    const c = await prisma.company.create({ data: { name, slug, website: `https://${slug}.example.com`, industry: 'Services', size: '11-50', about: `${name} about`, description: `${name} description`, address: 'Seed Address' } });
+    allCompanies.push(c);
+    createdCompanies++;
+    if (createdCompanies > TARGET * 2) break;
+  }
+
+  // Create users (mix of common and company) until TARGET
+  let createdUsers = 0;
+  const commonStart = allUsers.filter((u) => u.role === 'common').length;
+  while (allUsers.length < TARGET) {
+    const i = allUsers.length + 1;
+    const email = `seeduser${i}@example.com`;
+    const hash = await bcrypt.hash('password123', 10);
+    // Alternate assigning some users to companies
+    const assignCompany = i % 3 === 0 ? allCompanies[i % allCompanies.length].id : null;
+    const u = await prisma.user.create({ data: { email, passwordHash: hash, role: assignCompany ? 'company' : 'common', name: `Seed User ${i}`, companyId: assignCompany } });
+    allUsers.push(u);
+    createdUsers++;
+    if (createdUsers > TARGET * 2) break;
+  }
+
+  // Create jobs until TARGET
+  let jobCounter = allJobs.length;
+  const jobTypesArr = ['full_time', 'part_time', 'contract', 'internship', 'temporary', 'remote'];
+  while (allJobs.length < TARGET) {
+    jobCounter++;
+    const title = `Bulk Seed Job ${jobCounter}`;
+    const slug = toSlug(`${title}-${jobCounter}-${Date.now().toString().slice(-4)}`);
+    const company = allCompanies[jobCounter % allCompanies.length];
+    const city = cities[jobCounter % cities.length];
+    const created = await prisma.job.create({ data: {
+      slug,
+      title,
+      type: jobTypesArr[jobCounter % jobTypesArr.length],
+      location: city?.name || 'Kabul',
+      salaryMin: 300 + (jobCounter * 10),
+      salaryMax: 800 + (jobCounter * 10),
+      currency: 'USD',
+      description: `Bulk seeded job ${jobCounter}`,
+      skills: 'Node.js,SQL',
+      applyUrl: `https://example.com/jobs/${slug}`,
+      postedAt: new Date(),
+      closingDate: new Date(Date.now() + (30 + jobCounter) * 24 * 60 * 60 * 1000),
+      vacancies: 1,
+      experience: experiences[jobCounter % experiences.length],
+      education: educations[jobCounter % educations.length],
+      gender: 'any',
+      orgType: 'private',
+      status: 'published',
+      featured: jobCounter % 5 === 0,
+      cityId: city?.id || null,
+      companyId: company.id,
+    } });
+    allJobs.push(created);
+    // attach a random category
+    const cat = categorySlugs[jobCounter % categorySlugs.length];
+    const catId = categoryBySlug[cat];
+    if (catId) {
+      try {
+        await prisma.jobCategory.create({ data: { jobId: created.id, categoryId: catId } });
+      } catch {}
+    }
+    if (allJobs.length > TARGET * 2) break;
+  }
+
+  // Create services until TARGET
+  let svcCounter = allServices.length;
+  const svcTypes = ['procurement', 'scholarship'];
+  while (allServices.length < TARGET) {
+    svcCounter++;
+    const title = `Bulk Seed Service ${svcCounter}`;
+    const slug = toSlug(`${title}-${svcCounter}-${Date.now().toString().slice(-4)}`);
+    const company = allCompanies[svcCounter % allCompanies.length];
+    const city = cities[svcCounter % cities.length];
+    const created = await prisma.service.create({ data: {
+      slug,
+      title,
+      type: svcTypes[svcCounter % svcTypes.length],
+      description: `Bulk seeded service ${svcCounter}`,
+      organization: `Org ${svcCounter}`,
+      companyId: company.id,
+      cityId: city?.id || null,
+      country: 'Afghanistan',
+      category: 'General',
+      tags: 'seed',
+      eligibility: 'Open',
+      status: 'published',
+      postedAt: new Date(),
+      closingDate: new Date(Date.now() + (20 + svcCounter) * 24 * 60 * 60 * 1000),
+    } });
+    allServices.push(created);
+    if (allServices.length > TARGET * 2) break;
+  }
+
+  // Create job applications until TARGET
+  let createdJobApps = 0;
+  const availableJobs = allJobs.length ? allJobs : await prisma.job.findMany({});
+  const availableUsers = allUsers.length ? allUsers : await prisma.user.findMany({});
+  let jaIdx = 0;
+  while ((await prisma.jobApplication.count()) < TARGET) {
+    const j = availableJobs[jaIdx % availableJobs.length];
+    const u = availableUsers[(jaIdx + 3) % availableUsers.length];
+    try {
+      await prisma.jobApplication.upsert({
+        where: { jobId_userId: { jobId: j.id, userId: u.id } },
+        update: {},
+        create: {
+          jobId: j.id,
+          userId: u.id,
+          fullName: u.name || `Applicant ${u.id}`,
+          email: u.email,
+          status: 'applied',
+        },
+      });
+      createdJobApps++;
+    } catch {}
+    jaIdx++;
+    if (createdJobApps > TARGET * 3) break;
+  }
+
+  // Create service applications until TARGET
+  let createdSvcApps = 0;
+  let saIdx = 0;
+  const availableServices = allServices.length ? allServices : await prisma.service.findMany({});
+  while ((await prisma.serviceApplication.count()) < TARGET) {
+    const s = availableServices[saIdx % availableServices.length];
+    const u = availableUsers[(saIdx + 5) % availableUsers.length];
+    try {
+      await prisma.serviceApplication.upsert({
+        where: { serviceId_userId: { serviceId: s.id, userId: u.id } },
+        update: {},
+        create: {
+          serviceId: s.id,
+          userId: u.id,
+          fullName: u.name || `Applicant ${u.id}`,
+          email: u.email,
+          status: 'applied',
+        },
+      });
+      createdSvcApps++;
+    } catch {}
+    saIdx++;
+    if (createdSvcApps > TARGET * 3) break;
+  }
 }
 
 main()

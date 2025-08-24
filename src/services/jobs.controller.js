@@ -1,9 +1,22 @@
 import { prisma } from '../lib/prisma.js';
 import { httpError, notFound, unauthorized } from '../utils/httpError.js';
 
+// List jobs by companyId
+export async function listByCompany(req, res, next) {
+  try {
+    const { companyId } = req.params;
+    const items = await prisma.job.findMany({
+      where: { companyId: Number(companyId) },
+      orderBy: { postedAt: 'desc' },
+      include: { company: true, city: true, categories: { include: { category: true } } },
+    });
+    res.json(items);
+  } catch (err) { next(err); }
+}
+
 export async function list(req, res, next) {
   try {
-  const { q, location, type, status, cityId, categoryId, featured, withReviews, withReviewsCount, page = 1, pageSize = 20 } = req.query;
+    const { q, location, type, status, cityId, categoryId, featured, withReviews, withReviewsCount } = req.query;
     const where = {
       AND: [
         q ? { OR: [ { title: { contains: q } }, { description: { contains: q } }, { skills: { contains: q } } ] } : {},
@@ -15,11 +28,8 @@ export async function list(req, res, next) {
   categoryId ? { categories: { some: { categoryId: Number(categoryId) } } } : {},
       ],
     };
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [items, total] = await Promise.all([
-      prisma.job.findMany({ where, skip, take: Number(pageSize), orderBy: { postedAt: 'desc' }, include: { company: true, city: true, categories: { include: { category: true } } } }),
-      prisma.job.count({ where }),
-    ]);
+
+    const items = await prisma.job.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true, categories: { include: { category: true } } } });
 
     // Always attach review aggregates (avgRating, reviewCount) for list view
     if (items.length) {
@@ -60,7 +70,7 @@ export async function list(req, res, next) {
         for (const job of items) job.reviews = [];
       }
     }
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+  res.json(items);
   } catch (err) { next(err); }
 }
 

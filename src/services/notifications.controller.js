@@ -3,27 +3,22 @@ import { notFound, unauthorized, forbidden } from '../utils/httpError.js';
 
 export async function list(req, res, next) {
   try {
-    const { q, page = 1, pageSize = 20 } = req.query;
+    const { q } = req.query;
     const where = q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : {};
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [rows, total] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        skip,
-        take: Number(pageSize),
-        orderBy: { createdAt: 'desc' },
-        include: {
-          createdBy: true,
-          recipients: {
-            include: {
-              user: true,
-              company: true,
-            },
+
+    const rows = await prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        createdBy: true,
+        recipients: {
+          include: {
+            user: true,
+            company: true,
           },
         },
-      }),
-      prisma.notification.count({ where }),
-    ]);
+      },
+    });
 
     const items = rows.map((n) => ({
       ...n,
@@ -37,7 +32,7 @@ export async function list(req, res, next) {
       })),
     }));
 
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+    res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -146,7 +141,7 @@ export async function myInbox(req, res, next) {
     const userId = Number(req.user.id ?? req.user.sub);
     const companyId = req.user.companyId ? Number(req.user.companyId) : null;
 
-    const { page = 1, pageSize = 20, unreadOnly } = req.query;
+    const { unreadOnly } = req.query;
     const where = {
       OR: [
         { userId },
@@ -155,21 +150,15 @@ export async function myInbox(req, res, next) {
       ...(unreadOnly ? { isRead: false } : {}),
     };
 
-    const skip = (Number(page) - 1) * Number(pageSize);
-    const [rows, total] = await Promise.all([
-      prisma.notificationRecipient.findMany({
-        where,
-        skip,
-        take: Number(pageSize),
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: true,
-          company: true,
-          notification: { include: { createdBy: true } },
-        },
-      }),
-      prisma.notificationRecipient.count({ where }),
-    ]);
+    const rows = await prisma.notificationRecipient.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: true,
+        company: true,
+        notification: { include: { createdBy: true } },
+      },
+    });
 
     const items = rows.map((r) => ({
       ...r,
@@ -182,7 +171,7 @@ export async function myInbox(req, res, next) {
       },
     }));
 
-    res.json({ items, total, page: Number(page), pageSize: Number(pageSize) });
+    res.json(items);
   } catch (err) { next(err); }
 }
 
