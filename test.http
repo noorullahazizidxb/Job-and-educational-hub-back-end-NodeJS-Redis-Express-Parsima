@@ -35,7 +35,7 @@ POST {{base}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@example.com",
+  "email": "company@example.com",
   "password": "password123"
 }
 
