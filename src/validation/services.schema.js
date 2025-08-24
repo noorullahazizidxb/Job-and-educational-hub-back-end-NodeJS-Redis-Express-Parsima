@@ -8,8 +8,8 @@ export const listServicesSchema = Joi.object({
   type: type.optional(),
   status: status.optional(),
   cityId: Joi.number().integer().optional(),
-  page: Joi.number().integer().min(1).optional(),
-  pageSize: Joi.number().integer().min(1).max(100).optional(),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 }).unknown(false);
 
 export const createServiceSchema = Joi.object({

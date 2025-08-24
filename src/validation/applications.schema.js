@@ -24,6 +24,6 @@ export const listApplicationsSchema = Joi.object({
   serviceId: Joi.number().integer(),
   userId: Joi.number().integer(),
   status: Joi.string().valid('applied', 'viewed', 'shortlisted', 'rejected', 'hired', 'withdrawn'),
-  page: Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 });

@@ -2,8 +2,8 @@ import Joi from 'joi';
 
 export const listReviewsSchema = Joi.object({
   jobId: Joi.number().integer().required(),
-  page: Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 });
 
 export const createReviewSchema = Joi.object({

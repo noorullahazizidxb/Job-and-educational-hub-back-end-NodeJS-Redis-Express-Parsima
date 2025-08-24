@@ -15,6 +15,7 @@ import maintenanceRouter from './routes/maintenance.js';
 import applicationsRouter from './routes/applications.js';
 import settingsRouter from './routes/settings.js';
 import { authenticate } from './middleware/authn.js';
+import { prisma } from './lib/prisma.js';
 import authRouter from './routes/auth.js';
 import notificationsRouter from './routes/notifications.js';
 import reviewsRouter from './routes/reviews.js';
@@ -31,7 +32,15 @@ app.use(responseEnvelope());
 // static files for uploads
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', async (_req, res) => {
+  try {
+    // lightweight DB check
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, db: 'ok' });
+  } catch (err) {
+    res.status(503).json({ ok: false, db: 'down' });
+  }
+});
 app.use('/api/auth', authRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/companies', companiesRouter);

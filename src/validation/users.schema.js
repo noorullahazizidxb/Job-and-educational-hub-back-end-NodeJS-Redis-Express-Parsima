@@ -3,8 +3,9 @@ import Joi from 'joi';
 export const listUsersSchema = Joi.object({
   q: Joi.string().allow(''),
   role: Joi.string().valid('common', 'company', 'admin', 'employee'),
-  page: Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
+  // pagination removed: controllers return full arrays
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 });
 
 export const createUserSchema = Joi.object({

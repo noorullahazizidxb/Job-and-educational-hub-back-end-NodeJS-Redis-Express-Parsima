@@ -10,6 +10,7 @@ const router = Router();
 // Recipient endpoints (authenticated users/companies): list my notifications and mark read
 router.get('/me/inbox', requireAuth, validate(inboxQuerySchema, 'query'), NotificationsController.myInbox);
 router.post('/me/:recipientId/read', requireAuth, validate(markReadSchema), NotificationsController.markRead);
+router.post('/me/read-all', requireAuth, NotificationsController.markAllRead);
 
 // Admin: list and manage notifications
 router.get('/', requireAdmin(), validate(listNotificationsSchema, 'query'), NotificationsController.list);

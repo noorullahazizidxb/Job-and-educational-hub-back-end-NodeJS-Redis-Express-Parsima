@@ -10,8 +10,8 @@ const router = Router();
 const listCompaniesSchema = Joi.object({
 	q: Joi.string().allow(''),
 	cityId: Joi.number().integer(),
-	page: Joi.number().integer().min(1).default(1),
-	pageSize: Joi.number().integer().min(1).max(100).default(20),
+	page: Joi.forbidden(),
+	pageSize: Joi.forbidden(),
 });
 
 router.get('/', validate(listCompaniesSchema, 'query'), CompaniesController.list);

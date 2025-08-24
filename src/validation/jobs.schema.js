@@ -17,8 +17,8 @@ export const listJobsSchema = Joi.object({
   featured: Joi.boolean().optional(),
   withReviews: Joi.boolean().optional(),
   withReviewsCount: Joi.number().integer().min(0).max(10).optional(),
-  page: Joi.number().integer().min(1).optional(),
-  pageSize: Joi.number().integer().min(1).max(100).optional(),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 }).unknown(false);
 
 const baseJob = {

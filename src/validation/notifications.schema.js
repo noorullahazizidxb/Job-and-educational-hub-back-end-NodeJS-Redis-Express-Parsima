@@ -2,13 +2,13 @@ import Joi from 'joi';
 
 export const listNotificationsSchema = Joi.object({
   q: Joi.string().allow(''),
-  page: Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
 });
 
 export const inboxQuerySchema = Joi.object({
-  page: Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
+  page: Joi.forbidden(),
+  pageSize: Joi.forbidden(),
   unreadOnly: Joi.boolean().default(false),
 });
 

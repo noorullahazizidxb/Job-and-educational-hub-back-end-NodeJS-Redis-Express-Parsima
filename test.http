@@ -91,8 +91,8 @@ if (response.body && response.body.user) {
 # Companies
 ##############################
 
-### Companies: List with filters and pagination
-GET {{base}}/api/companies?q=acme&page=1&pageSize=10
+### Companies: List with filters
+GET {{base}}/api/companies?q=acme
 
 ### Companies: Detail by slug (seeded)
 GET {{base}}/api/companies/acme-corp
@@ -480,7 +480,7 @@ Content-Type: application/json
 
 
 ### Users: List (admin)
-GET {{base}}/api/users?q=&page=1&pageSize=50
+GET {{base}}/api/users?q=
 Authorization: Bearer {{adminToken}}
 
 ### Users: Detail (admin)
@@ -653,11 +653,11 @@ Content-Transfer-Encoding: binary
 --MyBoundary--
 
 ### List Job Applications (admin)
-GET {{base}}/api/applications/jobs?jobId={{seededJobId}}&page=1&pageSize=10
+GET {{base}}/api/applications/jobs?jobId={{seededJobId}}
 Authorization: Bearer {{adminToken}}
 
 ### List Service Applications (admin)
-GET {{base}}/api/applications/services?serviceId={{seededServiceId}}&page=1&pageSize=10
+GET {{base}}/api/applications/services?serviceId={{seededServiceId}}
 Authorization: Bearer {{adminToken}}
 
 ##############################
@@ -679,7 +679,7 @@ Content-Type: application/json
 }
 
 ### Notifications: Admin list
-GET {{base}}/api/notifications?page=1&pageSize=10
+GET {{base}}/api/notifications
 Authorization: Bearer {{adminToken}}
 
 ### Notifications: My Inbox (as company user)
@@ -702,7 +702,12 @@ Content-Type: application/json
 }
 
 ### Notifications: My Inbox (common user)
-GET {{base}}/api/notifications/me/inbox?unreadOnly=true&page=1&pageSize=10
+GET {{base}}/api/notifications/me/inbox?unreadOnly=true
+
+### Notifications: Mark all my notifications as read
+POST {{base}}/api/notifications/me/read-all
+Authorization: Bearer {{commonToken}}
+
 Authorization: Bearer {{commonToken}}
 
 ##############################
@@ -710,7 +715,7 @@ Authorization: Bearer {{commonToken}}
 ##############################
 
 ### Reviews: List by jobId (seeded)
-GET {{base}}/api/reviews?jobId={{seededJobId}}&page=1&pageSize=5
+GET {{base}}/api/reviews?jobId={{seededJobId}}
 
 ### Reviews: Create for job (authenticated common)
 POST {{base}}/api/reviews

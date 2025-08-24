@@ -196,3 +196,19 @@ export async function markRead(req, res, next) {
     res.json(updated);
   } catch (err) { next(err); }
 }
+
+export async function markAllRead(req, res, next) {
+  try {
+    if (!req.user) return next(unauthorized());
+    const userId = Number(req.user.id ?? req.user.sub);
+
+    // Mark all unread notification recipients belonging to this user as read
+    const result = await prisma.notificationRecipient.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    // result.count is the number of rows updated
+    res.json({ updated: result.count });
+  } catch (err) { next(err); }
+}

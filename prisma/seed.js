@@ -3,7 +3,20 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 
-const prisma = new PrismaClient();
+// Reuse the shared Prisma client when possible to avoid extra DB connections
+// during seeding in development. We import from the app lib if available.
+let prisma;
+try {
+  // eslint-disable-next-line import/no-unresolved
+  // Try to import the shared client from src (works when run in project root)
+  // Use dynamic import to avoid load-time issues when running `prisma db seed` externally.
+  // eslint-disable-next-line no-undef
+  const shared = await import(path.resolve(process.cwd(), 'src/lib/prisma.js'));
+  prisma = shared.prisma;
+} catch (e) {
+  // Fallback to creating a local client for environments where src/lib/prisma.js isn't resolvable
+  prisma = new PrismaClient();
+}
 
 function toSlug(s) {
   return s.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
