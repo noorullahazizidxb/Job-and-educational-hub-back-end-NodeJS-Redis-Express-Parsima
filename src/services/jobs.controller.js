@@ -29,6 +29,16 @@ export async function list(req, res, next) {
       ],
     };
 
+    // Role-based access: if authenticated and role is NOT admin/common, restrict to user's companyId
+    try {
+      const role = req.user?.role;
+      if (role && !['admin', 'common'].includes(role)) {
+        const cid = req.user.companyId ? Number(req.user.companyId) : null;
+        if (!cid) return res.json([]);
+        where.AND.push({ companyId: cid });
+      }
+    } catch (e) {}
+
     const items = await prisma.job.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true, categories: { include: { category: true } } } });
 
     // Always attach review aggregates (avgRating, reviewCount) for list view

@@ -25,6 +25,16 @@ export async function list(req, res, next) {
       ],
     };
 
+    // Role-based access: non-admin/non-common users only see services for their company
+    try {
+      const role = req.user?.role;
+      if (role && !['admin', 'common'].includes(role)) {
+        const cid = req.user.companyId ? Number(req.user.companyId) : null;
+        if (!cid) return res.json([]);
+        where.AND.push({ companyId: cid });
+      }
+    } catch (e) {}
+
     const items = await prisma.service.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true } });
     res.json(items);
   } catch (err) { next(err); }
