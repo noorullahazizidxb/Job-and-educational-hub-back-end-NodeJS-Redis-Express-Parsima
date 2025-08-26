@@ -1,5 +1,6 @@
+import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
-import { notFound } from '../utils/httpError.js';
+import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
 
 export async function list(req, res, next) {
   try {
@@ -73,7 +74,24 @@ export async function detail(req, res, next) {
 export async function create(req, res, next) {
   try {
     const data = req.body;
-    const item = await prisma.user.create({ data });
+
+    // Default role to 'common' when not provided
+    const role = data.role || 'common';
+
+    // If creating a non-common user, require that the requester is authenticated and an admin
+    if (role !== 'common') {
+      if (!req.user) return next(unauthorized('Authentication required to create this user role'));
+      if (req.user.role !== 'admin') return next(forbidden('Only admins can create users with this role'));
+    }
+
+    // If password was provided as 'passwordHash', assume it's pre-hashed; otherwise hash 'password'
+    const payload = { ...data };
+    if (payload.password) {
+      payload.passwordHash = await bcrypt.hash(payload.password, 10);
+      delete payload.password;
+    }
+
+    const item = await prisma.user.create({ data: payload });
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -81,7 +99,12 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const { id } = req.params;
-    const item = await prisma.user.update({ where: { id: Number(id) }, data: req.body });
+    const payload = { ...req.body };
+    if (payload.password) {
+      payload.passwordHash = await bcrypt.hash(payload.password, 10);
+      delete payload.password;
+    }
+    const item = await prisma.user.update({ where: { id: Number(id) }, data: payload });
     res.json(item);
   } catch (err) { next(err); }
 }

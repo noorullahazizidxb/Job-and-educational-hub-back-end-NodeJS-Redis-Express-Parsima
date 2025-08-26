@@ -7,7 +7,9 @@ import { requireAdmin } from '../middleware/authz.js';
 const router = Router();
 
 router.get('/', requireAdmin(), validate(listUsersSchema, 'query'), UsersController.list);
-router.post('/', requireAdmin(), validate(createUserSchema), UsersController.create);
+// Allow public creation of users with role 'common'. Controller will enforce
+// that creating non-'common' roles requires an admin.
+router.post('/', validate(createUserSchema), UsersController.create);
 router.get('/:id', requireAdmin(), UsersController.detail);
 router.patch('/:id', requireAdmin(), validate(updateUserSchema), UsersController.update);
 router.delete('/:id', requireAdmin(), UsersController.remove);
