@@ -12,15 +12,24 @@ function toSlug(name) {
 
 export async function list(req, res, next) {
   try {
-  const { q, cityId } = req.query;
-  const where = {
+    // If the authenticated user is a company, only return their company
+    const user = req.user;
+    if (user && user.role === 'company') {
+      const companyId = Number(user.companyId ?? user.sub ?? user.id);
+      if (!companyId) return res.json([]);
+      const company = await prisma.company.findUnique({ where: { id: companyId }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
+      return res.json(company ? [company] : []);
+    }
+
+    const { q, cityId } = req.query;
+    const where = {
       AND: [
         q ? { OR: [{ name: { contains: q } }, { industry: { contains: q } }, { about: { contains: q } }, { description: { contains: q } }] } : {},
         cityId ? { cityId: Number(cityId) } : {},
       ],
     };
-  const items = await prisma.company.findMany({ where, orderBy: { createdAt: 'desc' }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
-  res.json(items);
+    const items = await prisma.company.findMany({ where, orderBy: { createdAt: 'desc' }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
+    res.json(items);
   } catch (err) { next(err); }
 }
 

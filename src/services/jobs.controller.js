@@ -149,9 +149,31 @@ export async function createReview(req, res, next) {
 export async function create(req, res, next) {
   try {
     const { categoryIds, skills, ...rest } = req.body;
+    // Preserve DB defaults: if salaryMin/salaryMax are null or empty string, omit them so DB uses defaults
+    const data = { ...rest };
+    // If the property was not provided or is an empty string, omit it so DB default/behavior applies.
+    // If it's explicitly null, keep null so Prisma will write NULL into the DB.
+    if (!Object.prototype.hasOwnProperty.call(data, 'salaryMin') || data.salaryMin === '') {
+      delete data.salaryMin;
+    } else if (data.salaryMin === null) {
+      // keep explicit null
+    } else if (typeof data.salaryMin === 'string') {
+      const n = Number(data.salaryMin);
+      if (!Number.isNaN(n)) data.salaryMin = n;
+    }
+    if (!Object.prototype.hasOwnProperty.call(data, 'salaryMax') || data.salaryMax === '') {
+      delete data.salaryMax;
+    } else if (data.salaryMax === null) {
+      // keep explicit null
+    } else if (typeof data.salaryMax === 'string') {
+      const n = Number(data.salaryMax);
+      if (!Number.isNaN(n)) data.salaryMax = n;
+    }
+  // Normalize featuredUntil: convert empty string to null so DB default/null is used
+  if (data.featuredUntil === '') data.featuredUntil = null;
     const job = await prisma.job.create({
       data: {
-        ...rest,
+        ...data,
         skills: Array.isArray(skills) ? skills.join(',') : skills,
         categories: categoryIds?.length ? { createMany: { data: categoryIds.map((id) => ({ categoryId: Number(id) })) } } : undefined,
       },
@@ -166,6 +188,23 @@ export async function update(req, res, next) {
     const { slug } = req.params;
     const { categoryIds, ...payload } = req.body;
     const data = { ...payload };
+    // If salaryMin/salaryMax are explicitly null or empty, remove them so DB default remains
+    if (!Object.prototype.hasOwnProperty.call(data, 'salaryMin') || data.salaryMin === '') delete data.salaryMin;
+    else if (data.salaryMin === null) {
+      // keep explicit null
+    } else if (typeof data.salaryMin === 'string') {
+      const n = Number(data.salaryMin);
+      if (!Number.isNaN(n)) data.salaryMin = n;
+    }
+    if (!Object.prototype.hasOwnProperty.call(data, 'salaryMax') || data.salaryMax === '') delete data.salaryMax;
+    else if (data.salaryMax === null) {
+      // keep explicit null
+    } else if (typeof data.salaryMax === 'string') {
+      const n = Number(data.salaryMax);
+      if (!Number.isNaN(n)) data.salaryMax = n;
+    }
+  // Normalize featuredUntil: convert empty string to null before update
+  if (data.featuredUntil === '') data.featuredUntil = null;
     if (data.skills && Array.isArray(data.skills)) data.skills = data.skills.join(',');
     const job = await prisma.$transaction(async (tx) => {
       const updated = await tx.job.update({ where: { slug }, data });
