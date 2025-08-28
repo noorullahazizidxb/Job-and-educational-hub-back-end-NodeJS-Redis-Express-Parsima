@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
@@ -74,6 +76,11 @@ export async function detail(req, res, next) {
 export async function create(req, res, next) {
   try {
     const data = req.body;
+    const files = req.files || {};
+    const photoFile = req.file || files.photo?.[0];
+    if (photoFile) {
+      data.photo = `/uploads/profile/${photoFile.filename}`;
+    }
 
     // Default role to 'common' when not provided
     const role = data.role || 'common';
@@ -91,7 +98,7 @@ export async function create(req, res, next) {
       delete payload.password;
     }
 
-    const item = await prisma.user.create({ data: payload });
+  const item = await prisma.user.create({ data: payload });
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -100,6 +107,19 @@ export async function update(req, res, next) {
   try {
     const { id } = req.params;
     const payload = { ...req.body };
+    const files = req.files || {};
+    const photoFile = req.file || files.photo?.[0];
+    if (photoFile) {
+      // delete previous profile photo file if present
+      try {
+        const prev = await prisma.user.findUnique({ where: { id: Number(id) }, select: { photo: true } });
+        if (prev?.photo && typeof prev.photo === 'string' && prev.photo.startsWith('/uploads/profile/')) {
+          const filePath = path.resolve(process.cwd(), prev.photo.slice(1));
+          try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) { /* ignore deletion errors */ }
+        }
+      } catch (e) { /* ignore DB/read errors here; update will proceed */ }
+      payload.photo = `/uploads/profile/${photoFile.filename}`;
+    }
     if (payload.password) {
       payload.passwordHash = await bcrypt.hash(payload.password, 10);
       delete payload.password;

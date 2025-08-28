@@ -16,7 +16,7 @@ model Company {
   industry  String?
   size      String?   // e.g., 11-50, 51-200
   about     String?
-  description String?  @db.Text
+  description String  @db.LongText
   address   String?
   cityId    Int?
   city      City?     @relation(fields: [cityId], references: [id])
@@ -39,7 +39,7 @@ model Job {
   salaryMin   Int?
   salaryMax   Int?
   currency    String? @default("USD")
-  description String
+  description String  @db.LongText
   skills      String   // comma separated for simplicity
   benefits    String?  // comma separated or plain text
   applyUrl    String?  // alternatively email
@@ -178,7 +178,7 @@ model Service {
   type         ServiceType
   title        String
   slug         String       @unique
-  description  String
+  description String  @db.LongText
   organization String?
   companyId    Int?
   company      Company?     @relation(fields: [companyId], references: [id])
@@ -236,6 +236,7 @@ model User {
   jobReviews         JobReview[]
   createdNotifications Notification[] @relation("NotificationCreatedBy")
   notificationRecipients NotificationRecipient[]
+  photo              String?   // Optional profile photo stored as /uploads/profile/<filename>
 }
 
 // Notifications created by admins (or system) and recipients mapping

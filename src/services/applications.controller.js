@@ -1,7 +1,13 @@
 import { prisma } from '../lib/prisma.js';
+import { unauthorized, forbidden } from '../utils/httpError.js';
 
 export async function applyToJob(req, res, next) {
   try {
+    if (!req.user) return next(unauthorized());
+    if ((req.user.role || '').toString() !== 'common') return next(forbidden('Only common users can apply'));
+    const userId = Number(req.user.id ?? req.user.sub);
+    const applicant = await prisma.user.findUnique({ where: { id: userId } });
+    if (!applicant) return next(unauthorized());
     const files = req.files || {};
     const cv = files.cv?.[0];
     const cover = files.coverLetter?.[0];
@@ -9,9 +15,9 @@ export async function applyToJob(req, res, next) {
     // fields from multipart come as strings
     const data = {
       jobId: Number(body.jobId),
-      userId: Number(body.userId),
-      fullName: body.fullName,
-      email: body.email,
+      userId: userId,
+      fullName: applicant.name || applicant.email,
+      email: applicant.email,
       cvUrl: cv ? `/uploads/${cv.filename}` : body.cvUrl,
       coverLetter: cover ? `/uploads/${cover.filename}` : body.coverLetter,
       answers: body.answers ? tryParseJSON(body.answers) : undefined,
@@ -38,15 +44,20 @@ export async function listJobApplications(req, res, next) {
 
 export async function applyToService(req, res, next) {
   try {
+    if (!req.user) return next(unauthorized());
+    if ((req.user.role || '').toString() !== 'common') return next(forbidden('Only common users can apply'));
+    const userId = Number(req.user.id ?? req.user.sub);
+    const applicant = await prisma.user.findUnique({ where: { id: userId } });
+    if (!applicant) return next(unauthorized());
     const files = req.files || {};
     const cv = files.cv?.[0];
     const cover = files.coverLetter?.[0];
     const body = req.body || {};
     const data = {
       serviceId: Number(body.serviceId),
-      userId: Number(body.userId),
-      fullName: body.fullName,
-      email: body.email,
+      userId: userId,
+      fullName: applicant.name || applicant.email,
+      email: applicant.email,
       cvUrl: cv ? `/uploads/${cv.filename}` : body.cvUrl,
       coverLetter: cover ? `/uploads/${cover.filename}` : body.coverLetter,
     };

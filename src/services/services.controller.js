@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 // List services by companyId
 export async function listByCompany(req, res, next) {
   try {
@@ -70,6 +73,19 @@ export async function update(req, res, next) {
     const body = req.body || {};
     const data = { ...body };
     if (files && files.length) {
+      // delete previous documents (if any)
+      try {
+        const prev = await prisma.service.findUnique({ where: { slug }, select: { documents: true } });
+        if (prev?.documents && Array.isArray(prev.documents)) {
+          for (const doc of prev.documents) {
+            if (typeof doc === 'string' && doc.startsWith('/uploads/services/')) {
+              const filePath = path.resolve(process.cwd(), doc.slice(1));
+              try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+            }
+          }
+        }
+      } catch (e) { /* ignore DB/read errors */ }
+
       data.documents = files.map((f) => `/uploads/services/${f.filename}`);
     }
     const item = await prisma.service.update({ where: { slug }, data });
