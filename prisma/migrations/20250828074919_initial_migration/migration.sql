@@ -145,6 +145,10 @@ CREATE TABLE `User` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `photo` VARCHAR(191) NULL,
+    `about` VARCHAR(191) NULL,
+    `skills` VARCHAR(191) NULL,
+    `phone` VARCHAR(191) NULL,
+    `address` VARCHAR(191) NULL,
 
     UNIQUE INDEX `User_email_key`(`email`),
     PRIMARY KEY (`id`)

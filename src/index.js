@@ -24,6 +24,13 @@ import { responseEnvelope, getEntityFromRequest } from './middleware/response.js
 const app = express();
 
 app.use(helmet());
+// Allow images and other static resources to be loaded from other origins (e.g. frontend running on a different port)
+// without being blocked by the Cross-Origin-Resource-Policy header.
+app.use(
+  helmet.crossOriginResourcePolicy({
+    policy: 'cross-origin',
+  }),
+);
 app.use(cors());
 app.use(express.json({limit:'10mb'}));
 app.use(express.urlencoded({limit:'10mb'}));

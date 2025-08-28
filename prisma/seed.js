@@ -76,7 +76,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: { role: 'admin' },
-    create: { email: adminEmail, passwordHash: adminHash, role: 'admin', name: 'Site Admin' },
+  create: { email: adminEmail, passwordHash: adminHash, role: 'admin', name: 'Site Admin', about: 'Administrator account', skills: null, phone: null, address: null },
   });
 
   // Default theme setting (only create if missing to avoid overwriting user changes)
@@ -183,7 +183,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: companyEmail },
     update: { role: 'company', companyId: company.id },
-    create: { email: companyEmail, passwordHash: companyHash, role: 'company', name: 'Acme HR', companyId: company.id },
+  create: { email: companyEmail, passwordHash: companyHash, role: 'company', name: 'Acme HR', companyId: company.id, about: 'HR contact for Acme', skills: null, phone: '020000000', address: '123 Main St' },
   });
   // Additional company users for the other companies
   let idxCompany = 1;
@@ -194,7 +194,7 @@ async function main() {
     await prisma.user.upsert({
       where: { email },
       update: { role: 'company', companyId: c.id },
-      create: { email, passwordHash: hash, role: 'company', name: `HR ${c.name}`, companyId: c.id },
+  create: { email, passwordHash: hash, role: 'company', name: `HR ${c.name}`, companyId: c.id, about: `HR for ${c.name}`, skills: null, phone: null, address: null },
     });
     idxCompany++;
   }
@@ -205,8 +205,8 @@ async function main() {
     const hash = await bcrypt.hash('password123', 10);
     await prisma.user.upsert({
       where: { email },
-      update: { name: `User ${i}` },
-      create: { email, passwordHash: hash, role: 'common', name: `User ${i}` },
+  update: { name: `User ${i}` },
+  create: { email, passwordHash: hash, role: 'common', name: `User ${i}`, about: `I am User ${i}`, skills: 'communication,teamwork', phone: null, address: null },
     });
   }
 

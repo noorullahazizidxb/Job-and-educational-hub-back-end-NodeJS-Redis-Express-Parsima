@@ -75,15 +75,12 @@ export async function detail(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const data = req.body;
+    const body = req.body || {};
     const files = req.files || {};
     const photoFile = req.file || files.photo?.[0];
-    if (photoFile) {
-      data.photo = `/uploads/profile/${photoFile.filename}`;
-    }
 
     // Default role to 'common' when not provided
-    const role = data.role || 'common';
+    const role = body.role || 'common';
 
     // If creating a non-common user, require that the requester is authenticated and an admin
     if (role !== 'common') {
@@ -91,14 +88,27 @@ export async function create(req, res, next) {
       if (req.user.role !== 'admin') return next(forbidden('Only admins can create users with this role'));
     }
 
-    // If password was provided as 'passwordHash', assume it's pre-hashed; otherwise hash 'password'
-    const payload = { ...data };
-    if (payload.password) {
-      payload.passwordHash = await bcrypt.hash(payload.password, 10);
-      delete payload.password;
+    const payload = {
+      email: body.email,
+      name: body.name || null,
+      role,
+      companyId: body.companyId ? Number(body.companyId) : null,
+      about: body.about || null,
+      skills: body.skills || null,
+      phone: body.phone || null,
+      address: body.address || null,
+  };
+
+  if (photoFile) payload.photo = `/uploads/profile/${photoFile.filename}`;
+
+  // handle password hashing
+    if (body.password) {
+      payload.passwordHash = await bcrypt.hash(body.password, 10);
+    } else if (body.passwordHash) {
+      payload.passwordHash = body.passwordHash;
     }
 
-  const item = await prisma.user.create({ data: payload });
+    const item = await prisma.user.create({ data: payload });
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -106,9 +116,21 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const { id } = req.params;
-    const payload = { ...req.body };
+    const body = req.body || {};
     const files = req.files || {};
     const photoFile = req.file || files.photo?.[0];
+
+    const payload = {
+      email: body.email,
+      name: body.name,
+      role: body.role,
+      companyId: body.companyId ? Number(body.companyId) : null,
+      about: body.about ?? null,
+      skills: body.skills ?? null,
+      phone: body.phone ?? null,
+      address: body.address ?? null,
+    };
+
     if (photoFile) {
       // delete previous profile photo file if present
       try {
@@ -120,10 +142,14 @@ export async function update(req, res, next) {
       } catch (e) { /* ignore DB/read errors here; update will proceed */ }
       payload.photo = `/uploads/profile/${photoFile.filename}`;
     }
-    if (payload.password) {
-      payload.passwordHash = await bcrypt.hash(payload.password, 10);
-      delete payload.password;
+
+    // handle password hashing on update
+    if (body.password) {
+      payload.passwordHash = await bcrypt.hash(body.password, 10);
+    } else if (body.passwordHash) {
+      payload.passwordHash = body.passwordHash;
     }
+
     const item = await prisma.user.update({ where: { id: Number(id) }, data: payload });
     res.json(item);
   } catch (err) { next(err); }
@@ -132,6 +158,15 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const { id } = req.params;
+    // delete profile photo from disk if present
+    try {
+      const prev = await prisma.user.findUnique({ where: { id: Number(id) }, select: { photo: true } });
+      if (prev?.photo && typeof prev.photo === 'string' && prev.photo.startsWith('/uploads/profile/')) {
+        const filePath = path.resolve(process.cwd(), prev.photo.slice(1));
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+
     await prisma.user.delete({ where: { id: Number(id) } });
     res.status(204).end();
   } catch (err) { next(err); }

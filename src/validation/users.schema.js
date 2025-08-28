@@ -17,6 +17,10 @@ export const createUserSchema = Joi.object({
   role: Joi.string().valid('common', 'company', 'admin', 'employee').default('common'),
   companyId: Joi.number().integer().allow(null),
   photo: Joi.string().uri().allow('', null),
+  about: Joi.string().max(2000).allow('', null),
+  skills: Joi.string().max(500).allow('', null),
+  phone: Joi.string().max(40).allow('', null),
+  address: Joi.string().max(300).allow('', null),
 }).or('password', 'passwordHash');
 
 export const updateUserSchema = Joi.object({
@@ -27,4 +31,8 @@ export const updateUserSchema = Joi.object({
   role: Joi.string().valid('common', 'company', 'admin', 'employee'),
   companyId: Joi.number().integer().allow(null),
   photo: Joi.string().uri().allow('', null),
+  about: Joi.string().max(2000).allow('', null),
+  skills: Joi.string().max(500).allow('', null),
+  phone: Joi.string().max(40).allow('', null),
+  address: Joi.string().max(300).allow('', null),
 });

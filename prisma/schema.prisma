@@ -237,6 +237,10 @@ model User {
   createdNotifications Notification[] @relation("NotificationCreatedBy")
   notificationRecipients NotificationRecipient[]
   photo              String?   // Optional profile photo stored as /uploads/profile/<filename>
+  about              String?   // Optional 'about me' text
+  skills             String?   // Optional skills, comma separated
+  phone              String?   // Optional phone number
+  address            String?   // Optional address
 }
 
 // Notifications created by admins (or system) and recipients mapping
