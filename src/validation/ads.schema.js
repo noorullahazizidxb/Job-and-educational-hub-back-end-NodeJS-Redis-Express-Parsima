@@ -48,5 +48,5 @@ export const listAdsQuerySchema = Joi.object({
   'middle_of_related_services_on_service_details'
   ),
   activeOnly: Joi.boolean().truthy('true', '1').falsy('false', '0').default(false),
-  limit: Joi.number().integer().min(1).max(50).default(10)
+  limit: Joi.number().integer().min(1).max(1000).optional()
 });

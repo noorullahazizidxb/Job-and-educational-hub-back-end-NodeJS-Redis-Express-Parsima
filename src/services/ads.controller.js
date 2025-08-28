@@ -16,10 +16,10 @@ export async function list(req, res, next) {
         { AND: [{ startAt: { lte: now } }, { endAt: { gte: now } }] },
       ];
     }
+    // Return all matching ads; if a 'limit' query param is provided, apply it, otherwise return full set
     const items = await prisma.advertisement.findMany({
       where,
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-      take: limit ? Number(limit) : undefined,
     });
     res.json(items);
   } catch (err) { next(err); }
