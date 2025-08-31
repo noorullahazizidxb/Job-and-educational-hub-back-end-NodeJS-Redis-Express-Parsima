@@ -7,7 +7,7 @@
 
 @base = http://localhost:4000
 @ts = {{$timestamp}}
-@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzU1OTI2NDk0LCJleHAiOjE3NTY1MzEyOTR9.LiqzygSBscJ_WMgyuauNsWCBHSMnT_4MH8gsjX1gPvw
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzU2NTE1NDQyLCJleHAiOjE3NTcxMjAyNDJ9.Avabc-51Z_7CslBaTIcrABcT2b3YcT3VHA7Yesv7oOA
 @companyToken = 
 @commonToken = 
 # Placeholders to avoid undefined variable lint errors; these get overwritten by captures below.
@@ -135,6 +135,9 @@ Authorization: Bearer {{adminToken}}
 ### Jobs: List
 GET {{base}}/api/jobs
 
+### Jobs: Featured (full relations)
+GET {{base}}/api/jobs/featured
+
 ### Jobs: List (default includes avgRating, reviewCount, and latest 3 reviews per job)
 GET {{base}}/api/jobs/frontend-developer-acme
 
@@ -226,6 +229,15 @@ GET {{base}}/api/jobs?withReviewsCount=5
 
 ### Services: List
 GET {{base}}/api/services
+
+### Services: Featured (full relations)
+GET {{base}}/api/services/featured
+
+> {%
+if (response.body && Array.isArray(response.body)) {
+  client.global.set('featuredServicesCount', String(response.body.length));
+}
+%}
 
 ### Services: Detail (seeded) — capture seeded service id
 GET {{base}}/api/services/acme-scholarship-2025
@@ -398,6 +410,70 @@ Authorization: Bearer {{adminToken}}
 
 ### Categories: List
 GET {{base}}/api/categories
+
+##############################
+# Application Status Change Tests
+##############################
+
+### Job Application: mark as viewed (company)
+PATCH {{base}}/api/applications/jobs/{{jobAppId}}/viewed
+Authorization: Bearer {{companyToken}}
+
+
+### Job Application: mark as shortlisted (admin)
+PATCH {{base}}/api/applications/jobs/{{jobAppId}}/shortlisted
+Authorization: Bearer {{adminToken}}
+
+
+### Job Application: mark as rejected (company)
+PATCH {{base}}/api/applications/jobs/{{jobAppId}}/rejected
+Authorization: Bearer {{companyToken}}
+
+
+### Job Application: mark as hired (admin)
+PATCH {{base}}/api/applications/jobs/{{jobAppId}}/hired
+Authorization: Bearer {{adminToken}}
+
+
+### Job Application: mark as withdrawn (company)
+PATCH {{base}}/api/applications/jobs/{{jobAppId}}/withdrawn
+Authorization: Bearer {{companyToken}}
+
+
+### Service Application: mark as viewed (company)
+PATCH {{base}}/api/applications/services/{{serviceAppId}}/viewed
+Authorization: Bearer {{companyToken}}
+
+
+### Service Application: mark as shortlisted (admin)
+PATCH {{base}}/api/applications/services/{{serviceAppId}}/shortlisted
+Authorization: Bearer {{adminToken}}
+
+
+### Service Application: mark as rejected (company)
+PATCH {{base}}/api/applications/services/{{serviceAppId}}/rejected
+Authorization: Bearer {{companyToken}}
+
+
+### Service Application: mark as hired (admin)
+PATCH {{base}}/api/applications/services/{{serviceAppId}}/hired
+Authorization: Bearer {{adminToken}}
+
+
+### Service Application: mark as withdrawn (company)
+PATCH {{base}}/api/applications/services/{{serviceAppId}}/withdrawn
+Authorization: Bearer {{companyToken}}
+
+
+### Verify applicant inbox for notifications (common)
+GET {{base}}/api/notifications/me/inbox
+Authorization: Bearer {{commonToken}}
+
+> {%
+if (response.body && Array.isArray(response.body) && response.body.length) {
+  client.global.set('lastNotifId', String(response.body[0].id));
+}
+%}
 
 ### Categories: Create (admin) a QA category (captures id)
 POST {{base}}/api/categories
@@ -656,9 +732,21 @@ Content-Transfer-Encoding: binary
 GET {{base}}/api/applications/jobs?jobId={{seededJobId}}
 Authorization: Bearer {{adminToken}}
 
+> {%
+if (response.body && Array.isArray(response.body) && response.body.length) {
+  client.global.set('jobAppId', String(response.body[0].id));
+}
+%}
+
 ### List Service Applications (admin)
 GET {{base}}/api/applications/services?serviceId={{seededServiceId}}
 Authorization: Bearer {{adminToken}}
+
+> {%
+if (response.body && Array.isArray(response.body) && response.body.length) {
+  client.global.set('serviceAppId', String(response.body[0].id));
+}
+%}
 
 ##############################
 # Notifications

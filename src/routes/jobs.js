@@ -7,6 +7,8 @@ import { requireRole, requireAdmin } from '../middleware/authz.js';
 const router = Router();
 
 router.get('/', validate(listJobsSchema, 'query'), JobsController.list);
+// Featured jobs (full relations like list/detail)
+router.get('/featured', JobsController.featured);
 // Get jobs by companyId
 router.get('/by-company/:companyId', requireRole(['company', 'admin', 'employee']), JobsController.listByCompany);
 router.post('/', requireRole(['company', 'admin', 'employee']), validate(createJobSchema), JobsController.create);

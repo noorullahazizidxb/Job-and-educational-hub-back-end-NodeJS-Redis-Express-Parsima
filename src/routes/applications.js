@@ -33,4 +33,18 @@ router.post(
 	ApplicationsController.applyToService
 );
 
+// Status change endpoints for job applications (admin & company only)
+router.patch('/jobs/:id/viewed', requireRole(['admin','company']), ApplicationsController.markJobApplicationViewed);
+router.patch('/jobs/:id/shortlisted', requireRole(['admin','company']), ApplicationsController.markJobApplicationShortlisted);
+router.patch('/jobs/:id/rejected', requireRole(['admin','company']), ApplicationsController.markJobApplicationRejected);
+router.patch('/jobs/:id/hired', requireRole(['admin','company']), ApplicationsController.markJobApplicationHired);
+router.patch('/jobs/:id/withdrawn', requireRole(['admin','company']), ApplicationsController.markJobApplicationWithdrawn);
+
+// Status change endpoints for service applications (admin & company only)
+router.patch('/services/:id/viewed', requireRole(['admin','company']), ApplicationsController.markServiceApplicationViewed);
+router.patch('/services/:id/shortlisted', requireRole(['admin','company']), ApplicationsController.markServiceApplicationShortlisted);
+router.patch('/services/:id/rejected', requireRole(['admin','company']), ApplicationsController.markServiceApplicationRejected);
+router.patch('/services/:id/hired', requireRole(['admin','company']), ApplicationsController.markServiceApplicationHired);
+router.patch('/services/:id/withdrawn', requireRole(['admin','company']), ApplicationsController.markServiceApplicationWithdrawn);
+
 export default router;

@@ -16,9 +16,9 @@ export const createUserSchema = Joi.object({
   name: Joi.string().max(120).allow('', null),
   role: Joi.string().valid('common', 'company', 'admin', 'employee').default('common'),
   companyId: Joi.number().integer().allow(null),
-  photo: Joi.string().uri().allow('', null),
+  photo: Joi.any().allow('', null),
   about: Joi.string().max(2000).allow('', null),
-  skills: Joi.string().max(500).allow('', null),
+  skills: Joi.alternatives().try(Joi.string().max(500), Joi.array().items(Joi.string().max(120))).allow('', null),
   phone: Joi.string().max(40).allow('', null),
   address: Joi.string().max(300).allow('', null),
 }).or('password', 'passwordHash');
@@ -30,9 +30,9 @@ export const updateUserSchema = Joi.object({
   name: Joi.string().max(120).allow('', null),
   role: Joi.string().valid('common', 'company', 'admin', 'employee'),
   companyId: Joi.number().integer().allow(null),
-  photo: Joi.string().uri().allow('', null),
+  photo: Joi.any().allow('', null),
   about: Joi.string().max(2000).allow('', null),
-  skills: Joi.string().max(500).allow('', null),
+  skills: Joi.alternatives().try(Joi.string().max(500), Joi.array().items(Joi.string().max(120))).allow('', null),
   phone: Joi.string().max(40).allow('', null),
   address: Joi.string().max(300).allow('', null),
 });

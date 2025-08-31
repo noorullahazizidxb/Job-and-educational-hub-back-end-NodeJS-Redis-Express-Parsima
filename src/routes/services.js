@@ -8,6 +8,8 @@ import { requireRole } from '../middleware/authz.js';
 const router = Router();
 
 router.get('/', validate(listServicesSchema, 'query'), ServicesController.list);
+// Featured services (full relations)
+router.get('/featured', ServicesController.featured);
 // Get services by companyId
 router.get('/by-company/:companyId', requireRole(['company', 'admin', 'employee']), ServicesController.listByCompany);
 // accept optional service documents upload (field name: documents)

@@ -63,7 +63,8 @@ export const uploadService = multer({ storage: serviceStorage, fileFilter, limit
 export const uploadProfile = multer({
   storage: profileStorage,
   fileFilter: (_req, file, cb) => {
-    const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif']);
+    // Accept common image mime types including some vendor variants
+    const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
     if (allowedImageTypes.has(file.mimetype)) return cb(null, true);
     cb(new Error('Invalid image type'));
   },

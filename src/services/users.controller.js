@@ -126,7 +126,8 @@ export async function update(req, res, next) {
       role: body.role,
       companyId: body.companyId ? Number(body.companyId) : null,
       about: body.about ?? null,
-      skills: body.skills ?? null,
+  // Accept skills as either an array or a comma-separated string. Store as CSV string.
+  skills: Array.isArray(body.skills) ? body.skills.join(',') : (body.skills ?? null),
       phone: body.phone ?? null,
       address: body.address ?? null,
     };

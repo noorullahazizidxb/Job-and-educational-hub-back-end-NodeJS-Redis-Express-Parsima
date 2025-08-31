@@ -39,7 +39,16 @@ export async function list(req, res, next) {
       }
     } catch (e) {}
 
-    const items = await prisma.job.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true, categories: { include: { category: true } } } });
+    const items = await prisma.job.findMany({
+      where,
+      orderBy: { postedAt: 'desc' },
+      include: {
+        company: true,
+        city: true,
+        categories: { include: { category: true } },
+  applications: { include: { user: true } },
+      },
+    });
 
     // Always attach review aggregates (avgRating, reviewCount) for list view
     if (items.length) {
@@ -84,6 +93,66 @@ export async function list(req, res, next) {
   } catch (err) { next(err); }
 }
 
+export async function featured(req, res, next) {
+  try {
+    const { withReviewsCount } = req.query;
+    const now = new Date();
+    const items = await prisma.job.findMany({
+      where: {
+        featured: true,
+        OR: [
+          { featuredUntil: null },
+          { featuredUntil: { gt: now } },
+        ],
+      },
+      orderBy: { postedAt: 'desc' },
+      include: {
+        company: true,
+        city: true,
+        categories: { include: { category: true } },
+        applications: { include: { user: true } },
+      },
+    });
+
+    if (items.length) {
+      const ids = items.map((j) => j.id);
+      const grouped = await prisma.jobReview.groupBy({
+        by: ['jobId'],
+        _avg: { rating: true },
+        _count: true,
+        where: { jobId: { in: ids } },
+      });
+      const aggMap = new Map(grouped.map((g) => [g.jobId, { avgRating: g._avg.rating ?? 0, reviewCount: g._count }]));
+      for (const job of items) {
+        const agg = aggMap.get(job.id) || { avgRating: 0, reviewCount: 0 };
+        job.avgRating = agg.avgRating;
+        job.reviewCount = agg.reviewCount;
+        job.catagory = (job.categories?.[0]?.category?.name) || null;
+      }
+
+      const count = withReviewsCount != null ? Number(withReviewsCount) : 3;
+      if (count > 0) {
+        const reviews = await prisma.jobReview.findMany({
+          where: { jobId: { in: ids } },
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        const byJob = new Map();
+        for (const r of reviews) {
+          if (!byJob.has(r.jobId)) byJob.set(r.jobId, []);
+          const arr = byJob.get(r.jobId);
+          if (arr.length < count) arr.push(r);
+        }
+        for (const job of items) job.reviews = byJob.get(job.id) || [];
+      } else {
+        for (const job of items) job.reviews = [];
+      }
+    }
+
+    res.json(items);
+  } catch (err) { next(err); }
+}
+
 export async function detail(req, res, next) {
   try {
     const { slug } = req.params;
@@ -93,6 +162,7 @@ export async function detail(req, res, next) {
       company: true,
       city: true,
       categories: { include: { category: true } },
+  applications: { include: { user: true } },
     },
   });
   if (!job) return next(notFound());

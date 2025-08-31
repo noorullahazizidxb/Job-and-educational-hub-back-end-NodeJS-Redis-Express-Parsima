@@ -8,7 +8,11 @@ export async function listByCompany(req, res, next) {
     const items = await prisma.service.findMany({
       where: { companyId: Number(companyId) },
       orderBy: { postedAt: 'desc' },
-      include: { company: true, city: true },
+      include: {
+        company: true,
+        city: true,
+  applications: { include: { user: true } },
+      },
     });
   res.json(items);
   } catch (err) { next(err); }
@@ -38,7 +42,37 @@ export async function list(req, res, next) {
       }
     } catch (e) {}
 
-    const items = await prisma.service.findMany({ where, orderBy: { postedAt: 'desc' }, include: { company: true, city: true } });
+    const items = await prisma.service.findMany({
+      where,
+      orderBy: { postedAt: 'desc' },
+      include: {
+        company: true,
+        city: true,
+        applications: { include: { user: { select: { id: true, name: true, email: true, photo: true } } } },
+      },
+    });
+    res.json(items);
+  } catch (err) { next(err); }
+}
+
+export async function featured(req, res, next) {
+  try {
+    const now = new Date();
+    const items = await prisma.service.findMany({
+      where: {
+        featured: true,
+        OR: [
+          { featuredUntil: null },
+          { featuredUntil: { gt: now } },
+        ],
+      },
+      orderBy: { postedAt: 'desc' },
+      include: {
+        company: true,
+        city: true,
+        applications: { include: { user: true } },
+      },
+    });
     res.json(items);
   } catch (err) { next(err); }
 }
@@ -46,7 +80,14 @@ export async function list(req, res, next) {
 export async function detail(req, res, next) {
   try {
     const { slug } = req.params;
-  const item = await prisma.service.findUnique({ where: { slug }, include: { company: true, city: true } });
+  const item = await prisma.service.findUnique({
+    where: { slug },
+    include: {
+      company: true,
+      city: true,
+  applications: { include: { user: true } },
+    },
+  });
   if (!item) return next(notFound());
     res.json(item);
   } catch (err) { next(err); }

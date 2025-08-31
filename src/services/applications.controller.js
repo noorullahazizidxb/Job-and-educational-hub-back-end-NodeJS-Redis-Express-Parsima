@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { unauthorized, forbidden } from '../utils/httpError.js';
+import { unauthorized, forbidden, notFound } from '../utils/httpError.js';
 
 export async function applyToJob(req, res, next) {
   try {
@@ -84,3 +84,73 @@ export async function listServiceApplications(req, res, next) {
   res.json(items);
   } catch (err) { next(err); }
 }
+
+// Helper to create notification and recipient for a single user
+async function createApplicationNotification({ title, body, createdById, userId }) {
+  return prisma.notification.create({
+    data: {
+      title,
+      body,
+      createdById: createdById ? Number(createdById) : undefined,
+      targetAll: false,
+      targetRole: 'common',
+      recipients: { create: [{ userId: Number(userId) }] },
+    },
+    include: { recipients: true },
+  });
+}
+
+// Generic updater for job application status
+async function _updateJobApplicationStatus(req, res, next, status) {
+  try {
+    if (!req.user) return next(unauthorized());
+    const role = (req.user.role || '').toString();
+    if (!['admin', 'company'].includes(role)) return next(forbidden());
+    const id = Number(req.params.id);
+    const app = await prisma.jobApplication.findUnique({ where: { id }, include: { job: true, user: true } });
+    if (!app) return next(notFound());
+    // company users can only operate on their own company's jobs
+    if (role === 'company') {
+      const cid = Number(req.user.companyId) || null;
+      if (!cid || app.job.companyId !== cid) return next(forbidden());
+    }
+    const updated = await prisma.jobApplication.update({ where: { id }, data: { status }, include: { job: true, user: true } });
+    const title = `updates on ${updated.job.title}`;
+    const body = `your application for (${updated.job.title}) has been ${status}`;
+    await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
+    res.json(updated);
+  } catch (err) { next(err); }
+}
+
+export async function markJobApplicationViewed(req, res, next) { return _updateJobApplicationStatus(req, res, next, 'viewed'); }
+export async function markJobApplicationShortlisted(req, res, next) { return _updateJobApplicationStatus(req, res, next, 'shortlisted'); }
+export async function markJobApplicationRejected(req, res, next) { return _updateJobApplicationStatus(req, res, next, 'rejected'); }
+export async function markJobApplicationHired(req, res, next) { return _updateJobApplicationStatus(req, res, next, 'hired'); }
+export async function markJobApplicationWithdrawn(req, res, next) { return _updateJobApplicationStatus(req, res, next, 'withdrawn'); }
+
+// Generic updater for service application status
+async function _updateServiceApplicationStatus(req, res, next, status) {
+  try {
+    if (!req.user) return next(unauthorized());
+    const role = (req.user.role || '').toString();
+    if (!['admin', 'company'].includes(role)) return next(forbidden());
+    const id = Number(req.params.id);
+    const app = await prisma.serviceApplication.findUnique({ where: { id }, include: { service: true, user: true } });
+    if (!app) return next(notFound());
+    if (role === 'company') {
+      const cid = Number(req.user.companyId) || null;
+      if (!cid || app.service.companyId !== cid) return next(forbidden());
+    }
+    const updated = await prisma.serviceApplication.update({ where: { id }, data: { status }, include: { service: true, user: true } });
+    const title = `updates on ${updated.service.title}`;
+    const body = `your application for (${updated.service.title}) has been ${status}`;
+    await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
+    res.json(updated);
+  } catch (err) { next(err); }
+}
+
+export async function markServiceApplicationViewed(req, res, next) { return _updateServiceApplicationStatus(req, res, next, 'viewed'); }
+export async function markServiceApplicationShortlisted(req, res, next) { return _updateServiceApplicationStatus(req, res, next, 'shortlisted'); }
+export async function markServiceApplicationRejected(req, res, next) { return _updateServiceApplicationStatus(req, res, next, 'rejected'); }
+export async function markServiceApplicationHired(req, res, next) { return _updateServiceApplicationStatus(req, res, next, 'hired'); }
+export async function markServiceApplicationWithdrawn(req, res, next) { return _updateServiceApplicationStatus(req, res, next, 'withdrawn'); }
