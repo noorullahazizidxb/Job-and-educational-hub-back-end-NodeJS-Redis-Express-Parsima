@@ -57,15 +57,8 @@ export async function list(req, res, next) {
 
 export async function featured(req, res, next) {
   try {
-    const now = new Date();
     const items = await prisma.service.findMany({
-      where: {
-        featured: true,
-        OR: [
-          { featuredUntil: null },
-          { featuredUntil: { gt: now } },
-        ],
-      },
+      where: { featured: true },
       orderBy: { postedAt: 'desc' },
       include: {
         company: true,
