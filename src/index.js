@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -32,13 +33,31 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json({limit:'10mb'}));
-app.use(express.urlencoded({limit:'10mb'}));
+// enable gzip/brotli compression for responses
+app.use(compression());
+
+// tighten request body limits by default; allow overriding with env vars
+const JSON_LIMIT = process.env.JSON_LIMIT || '100kb';
+const URLENCODED_LIMIT = process.env.URLENCODED_LIMIT || '100kb';
+app.use(express.json({ limit: JSON_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: URLENCODED_LIMIT }));
 app.use(morgan('dev'));
 app.use(authenticate);
 app.use(responseEnvelope());
-// static files for uploads
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// static files for uploads - cache aggressively (served via CDN in prod is recommended)
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), { maxAge: '7d', etag: true }));
+
+// Small caching middleware for common, read-heavy listing endpoints.
+// This sets a short public cache for GET listing endpoints (adjust TTL as needed).
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const listingPrefixes = ['/api/jobs', '/api/services', '/api/categories', '/api/cities', '/api/companies', '/api/ads'];
+  if (listingPrefixes.some((p) => req.path.startsWith(p))) {
+    // short cache to reduce DB pressure; controllers should set more specific cache headers when safe
+    res.setHeader('Cache-Control', 'public, max-age=60');
+  }
+  return next();
+});
 
 app.get('/health', async (_req, res) => {
   try {

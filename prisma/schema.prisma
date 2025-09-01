@@ -28,6 +28,7 @@ model Company {
   notificationRecipients NotificationRecipient[]
 
   @@index([name])
+  @@index([cityId])
 }
 
 model Job {
@@ -68,6 +69,9 @@ model Job {
 
   @@index([title, location, type])
   @@index([status, closingDate])
+  @@index([companyId])
+  @@index([cityId])
+  @@index([postedAt])
 }
 
 enum JobType {
@@ -200,6 +204,8 @@ model Service {
   applications ServiceApplication[]
 
   @@index([type, status, closingDate])
+  @@index([companyId])
+  @@index([cityId])
 }
 
 enum ServiceType {
@@ -241,6 +247,7 @@ model User {
   skills             String?   // Optional skills, comma separated
   phone              String?   // Optional phone number
   address            String?   // Optional address
+  @@index([companyId])
 }
 
 // Notifications created by admins (or system) and recipients mapping
@@ -312,6 +319,7 @@ model JobApplication {
 
   @@unique([jobId, userId])
   @@index([jobId, status])
+  @@index([userId])
 }
 
 // Applications for Services (scholarships, procurements)
@@ -331,6 +339,7 @@ model ServiceApplication {
 
   @@unique([serviceId, userId])
   @@index([serviceId, status])
+  @@index([userId])
 }
 
 // Flexible key/value site settings

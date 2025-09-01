@@ -58,8 +58,11 @@ function fileFilter(_req, file, cb) {
   cb(new Error('Invalid file type'));
 }
 
-export const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
-export const uploadService = multer({ storage: serviceStorage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+const DEFAULT_FILE_LIMIT = Number(process.env.FILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024; // 5MB default
+const DEFAULT_SERVICE_LIMIT = Number(process.env.SERVICE_UPLOAD_LIMIT_BYTES) || 10 * 1024 * 1024; // 10MB default
+
+export const upload = multer({ storage, fileFilter, limits: { fileSize: DEFAULT_FILE_LIMIT } });
+export const uploadService = multer({ storage: serviceStorage, fileFilter, limits: { fileSize: DEFAULT_SERVICE_LIMIT } });
 export const uploadProfile = multer({
   storage: profileStorage,
   fileFilter: (_req, file, cb) => {
@@ -68,5 +71,5 @@ export const uploadProfile = multer({
     if (allowedImageTypes.has(file.mimetype)) return cb(null, true);
     cb(new Error('Invalid image type'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // Limit to 5MB
+  limits: { fileSize: Number(process.env.PROFILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024 }, // Limit to 5MB
 });

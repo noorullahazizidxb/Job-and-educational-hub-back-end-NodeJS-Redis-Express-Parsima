@@ -233,12 +233,6 @@ GET {{base}}/api/services
 ### Services: Featured (full relations)
 GET {{base}}/api/services/featured
 
-> {%
-if (response.body && Array.isArray(response.body)) {
-  client.global.set('featuredServicesCount', String(response.body.length));
-}
-%}
-
 ### Services: Detail (seeded) — capture seeded service id
 GET {{base}}/api/services/acme-scholarship-2025
 
