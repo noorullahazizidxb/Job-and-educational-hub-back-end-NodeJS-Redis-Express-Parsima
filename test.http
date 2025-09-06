@@ -399,6 +399,14 @@ DELETE {{base}}/api/ads/{{qaAdId}}
 Authorization: Bearer {{adminToken}}
 
 ##############################
+
+##############################
+# Stats
+##############################
+
+### Stats: Overview (active jobs, companies, average time-to-hire)
+GET {{base}}/api/stats/overview
+
 # Categories (Admin/Employee)
 ##############################
 

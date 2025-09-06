@@ -17,7 +17,14 @@ export async function list(req, res, next) {
     if (user && user.role === 'company') {
       const companyId = Number(user.companyId ?? user.sub ?? user.id);
       if (!companyId) return res.json([]);
-      const company = await prisma.company.findUnique({ where: { id: companyId }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        include: {
+          _count: { select: { jobs: true, users: true } },
+          city: true,
+          jobs: { select: { id: true, title: true, slug: true, status: true, postedAt: true, vacancies: true, cityId: true } },
+        },
+      });
       return res.json(company ? [company] : []);
     }
 
@@ -28,7 +35,15 @@ export async function list(req, res, next) {
         cityId ? { cityId: Number(cityId) } : {},
       ],
     };
-    const items = await prisma.company.findMany({ where, orderBy: { createdAt: 'desc' }, include: { _count: { select: { jobs: true, users: true } }, city: true } });
+    const items = await prisma.company.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { jobs: true, users: true } },
+        city: true,
+        jobs: { select: { id: true, title: true, slug: true, status: true, postedAt: true, vacancies: true, cityId: true } },
+      },
+    });
     res.json(items);
   } catch (err) { next(err); }
 }

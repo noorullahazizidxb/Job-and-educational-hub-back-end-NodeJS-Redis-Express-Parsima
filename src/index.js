@@ -20,6 +20,7 @@ import { prisma } from './lib/prisma.js';
 import authRouter from './routes/auth.js';
 import notificationsRouter from './routes/notifications.js';
 import reviewsRouter from './routes/reviews.js';
+import statsRouter from './routes/stats.js';
 import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/applications', applicationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/reviews', reviewsRouter);
+app.use('/api/stats', statsRouter);
 
 app.use((err, req, res, _next) => {
   console.error(err);
