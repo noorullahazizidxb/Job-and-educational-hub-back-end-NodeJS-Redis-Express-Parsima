@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { getJson, setJson, del } from '../lib/cache.js';
 import { notFound } from '../utils/httpError.js';
 
 function toSlug(name) {
@@ -35,7 +36,11 @@ export async function list(req, res, next) {
         cityId ? { cityId: Number(cityId) } : {},
       ],
     };
-    const items = await prisma.company.findMany({
+  const cacheKey = `companies:list:${JSON.stringify({ q, cityId })}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const items = await prisma.company.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -44,7 +49,9 @@ export async function list(req, res, next) {
         jobs: { select: { id: true, title: true, slug: true, status: true, postedAt: true, vacancies: true, cityId: true } },
       },
     });
-    res.json(items);
+  // cache short-lived (30s)
+  await setJson(cacheKey, items, 30);
+  res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -64,6 +71,8 @@ export async function create(req, res, next) {
     const { name, website, logoUrl, industry, size, about, description, address, cityId } = req.body;
     const slug = req.body.slug?.trim() || toSlug(name);
     const company = await prisma.company.create({ data: { name, slug, website, logoUrl, industry, size, about, description, address, cityId } });
+    // Invalidate companies list cache
+    await del('companies:list:{}');
     res.status(201).json(company);
   } catch (err) { next(err); }
 }
@@ -76,6 +85,7 @@ export async function update(req, res, next) {
     const byId = Number(id);
     const where = Number.isNaN(byId) ? { slug: id } : { id: byId };
     const company = await prisma.company.update({ where, data });
+    await del('companies:list:{}');
     res.json(company);
   } catch (err) { next(err); }
 }
@@ -86,6 +96,7 @@ export async function remove(req, res, next) {
   const byId = Number(id);
   const where = Number.isNaN(byId) ? { slug: id } : { id: byId };
   await prisma.company.delete({ where });
-    res.status(204).end();
+  await del('companies:list:{}');
+  res.status(204).end();
   } catch (err) { next(err); }
 }

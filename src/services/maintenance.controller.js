@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { getJson, setJson, del } from '../lib/cache.js';
 
 // DELETE expired jobs and services and their dependent records.
 // Query params:
@@ -32,12 +33,17 @@ export async function cleanupExpired(req, res, next) {
     const serviceIds = expiredServices.map((s) => s.id);
 
     if (dryRun) {
-      return res.json({
+      const cacheKey = `maintenance:cleanup:dry:${before.toISOString()}:limit:${limit || ''}`;
+      const cached = await getJson(cacheKey);
+      if (cached) return res.json(cached);
+      const payload = {
         before,
         dryRun: true,
         jobs: { count: jobIds.length, ids: jobIds },
         services: { count: serviceIds.length, ids: serviceIds },
-      });
+      };
+      await setJson(cacheKey, payload, 30);
+      return res.json(payload);
     }
 
     // Delete dependents then main records in a transaction
@@ -64,6 +70,14 @@ export async function cleanupExpired(req, res, next) {
 
       return deleted;
     });
+
+    // Invalidate caches that may list deleted resources
+    try {
+      await del('jobs:list:{}');
+      await del('services:list:{}');
+      await del('jobApplications:list:{}');
+      await del('serviceApplications:list:{}');
+    } catch (e) { /* ignore cache errors */ }
 
     res.json({ before, dryRun: false, deleted: results });
   } catch (err) {

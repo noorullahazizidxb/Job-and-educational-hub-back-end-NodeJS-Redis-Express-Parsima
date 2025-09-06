@@ -3,6 +3,8 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
+import { getJson, setJson, del } from '../lib/cache.js';
+import { enqueueProfileOptimization } from '../middleware/upload.js';
 
 export async function list(req, res, next) {
   try {
@@ -13,7 +15,30 @@ export async function list(req, res, next) {
         role ? { role } : {},
       ],
     };
-  const items = await prisma.user.findMany({ where, orderBy: { createdAt: 'desc' }, include: { company: true } });
+  const cacheKey = `users:list:${JSON.stringify(req.query || {})}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const items = await prisma.user.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      companyId: true,
+      photo: true,
+      createdAt: true,
+      updatedAt: true,
+      company: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
     // For users with role 'common', include their job and service applications
     const commonIds = items.filter((u) => u.role === 'common').map((u) => u.id);
@@ -50,6 +75,7 @@ export async function list(req, res, next) {
       }
     }
 
+  await setJson(cacheKey, items, 30);
   res.json(items);
   } catch (err) { next(err); }
 }
@@ -57,8 +83,11 @@ export async function list(req, res, next) {
 export async function detail(req, res, next) {
   try {
     const { id } = req.params;
-    const userId = Number(id);
-    const item = await prisma.user.findUnique({ where: { id: userId }, include: { company: true } });
+  const userId = Number(id);
+  const cacheKey = `users:detail:${userId}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+  const item = await prisma.user.findUnique({ where: { id: userId }, include: { company: true } });
     if (!item) return next(notFound());
 
     if (item.role === 'common') {
@@ -69,7 +98,19 @@ export async function detail(req, res, next) {
       item.jobApplications = jobApplications;
       item.serviceApplications = serviceApplications;
     }
-    res.json(item);
+    // for common users include applications but avoid caching these personalized details
+    if (item.role === 'common') {
+      const [jobApplications, serviceApplications] = await Promise.all([
+        prisma.jobApplication.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, include: { job: true } }),
+        prisma.serviceApplication.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, include: { service: true } }),
+      ]);
+      item.jobApplications = jobApplications;
+      item.serviceApplications = serviceApplications;
+      res.json(item);
+    } else {
+      await setJson(cacheKey, item, 60);
+      res.json(item);
+    }
   } catch (err) { next(err); }
 }
 
@@ -108,8 +149,13 @@ export async function create(req, res, next) {
       payload.passwordHash = body.passwordHash;
     }
 
-    const item = await prisma.user.create({ data: payload });
-    res.status(201).json(item);
+  const item = await prisma.user.create({ data: payload });
+  // enqueue optimization job for profile photo (non-blocking)
+  if (photoFile) {
+    try { enqueueProfileOptimization(req, photoFile); } catch (e) { /* ignore */ }
+  }
+  await del('users:list:{}');
+  res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
@@ -151,8 +197,13 @@ export async function update(req, res, next) {
       payload.passwordHash = body.passwordHash;
     }
 
-    const item = await prisma.user.update({ where: { id: Number(id) }, data: payload });
-    res.json(item);
+  const item = await prisma.user.update({ where: { id: Number(id) }, data: payload });
+  if (photoFile) {
+    try { enqueueProfileOptimization(req, photoFile); } catch (e) { /* ignore */ }
+  }
+  await del('users:list:{}');
+  await del(`users:detail:${id}`);
+  res.json(item);
   } catch (err) { next(err); }
 }
 
@@ -168,7 +219,9 @@ export async function remove(req, res, next) {
       }
     } catch (e) { /* ignore */ }
 
-    await prisma.user.delete({ where: { id: Number(id) } });
-    res.status(204).end();
+  await prisma.user.delete({ where: { id: Number(id) } });
+  await del('users:list:{}');
+  await del(`users:detail:${id}`);
+  res.status(204).end();
   } catch (err) { next(err); }
 }

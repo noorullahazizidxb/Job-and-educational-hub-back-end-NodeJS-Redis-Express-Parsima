@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getJson, setJson, del } from '../lib/cache.js';
 
 // List services by companyId
 export async function listByCompany(req, res, next) {
@@ -42,7 +43,11 @@ export async function list(req, res, next) {
       }
     } catch (e) {}
 
-    const items = await prisma.service.findMany({
+  const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const items = await prisma.service.findMany({
       where,
       orderBy: { postedAt: 'desc' },
       include: {
@@ -51,13 +56,18 @@ export async function list(req, res, next) {
         applications: { include: { user: { select: { id: true, name: true, email: true, photo: true } } } },
       },
     });
-    res.json(items);
+  await setJson(cacheKey, items, 30);
+  res.json(items);
   } catch (err) { next(err); }
 }
 
 export async function featured(req, res, next) {
   try {
-    const items = await prisma.service.findMany({
+  const cacheKey = 'services:featured:{}';
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const items = await prisma.service.findMany({
       where: { featured: true },
       orderBy: { postedAt: 'desc' },
       include: {
@@ -66,13 +76,18 @@ export async function featured(req, res, next) {
         applications: { include: { user: true } },
       },
     });
-    res.json(items);
+  await setJson(cacheKey, items, 30);
+  res.json(items);
   } catch (err) { next(err); }
 }
 
 export async function detail(req, res, next) {
   try {
     const { slug } = req.params;
+    const cacheKey = `service:detail:${slug}`;
+    const cached = await getJson(cacheKey);
+    if (cached) return res.json(cached);
+
   const item = await prisma.service.findUnique({
     where: { slug },
     include: {
@@ -82,6 +97,7 @@ export async function detail(req, res, next) {
     },
   });
   if (!item) return next(notFound());
+    await setJson(cacheKey, item, 60);
     res.json(item);
   } catch (err) { next(err); }
 }
@@ -96,7 +112,9 @@ export async function create(req, res, next) {
       data.documents = files.map((f) => `/uploads/services/${f.filename}`);
     }
     const item = await prisma.service.create({ data });
-    res.status(201).json(item);
+  await del('services:list:{}');
+  await del('services:featured:{}');
+  res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
@@ -123,7 +141,10 @@ export async function update(req, res, next) {
       data.documents = files.map((f) => `/uploads/services/${f.filename}`);
     }
     const item = await prisma.service.update({ where: { slug }, data });
-    res.json(item);
+  await del('services:list:{}');
+  await del('services:featured:{}');
+  await del(`service:detail:${slug}`);
+  res.json(item);
   } catch (err) { next(err); }
 }
 
@@ -131,6 +152,9 @@ export async function remove(req, res, next) {
   try {
     const { slug } = req.params;
     await prisma.service.delete({ where: { slug } });
-    res.status(204).end();
+  await del('services:list:{}');
+  await del('services:featured:{}');
+  await del(`service:detail:${slug}`);
+  res.status(204).end();
   } catch (err) { next(err); }
 }

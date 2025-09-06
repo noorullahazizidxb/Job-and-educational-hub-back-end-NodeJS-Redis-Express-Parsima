@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { createQueue } from '../lib/queue.js';
 import multer from 'multer';
 
 const uploadDir = path.resolve(process.cwd(), 'uploads');
@@ -73,3 +74,16 @@ export const uploadProfile = multer({
   },
   limits: { fileSize: Number(process.env.PROFILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024 }, // Limit to 5MB
 });
+
+// If a profile upload route wants to enqueue optimization, they can call this helper.
+export function enqueueProfileOptimization(req, file) {
+  try {
+    // create queue lazily
+    const q = createQueue('image-processor');
+    const filePath = `/uploads/profile/${file.filename}`;
+    q.add('optimize', { filePath, mime: file.mimetype });
+  } catch (e) {
+    // ignore queue errors — upload should not fail because optimization is unavailable
+    console.error('enqueueProfileOptimization error', e?.message || e);
+  }
+}

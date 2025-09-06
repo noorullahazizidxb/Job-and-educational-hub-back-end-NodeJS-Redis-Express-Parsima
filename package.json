@@ -9,7 +9,9 @@
     "migrate": "prisma migrate dev",
     "generate": "prisma generate",
     "seed": "prisma db seed",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "worker": "node ./src/queue/imageProcessor.js",
+    "cleanup": "node ./src/queue/dailyCleanup.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -17,15 +19,19 @@
   "dependencies": {
     "@prisma/client": "^6.15.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.58.5",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "rate-limiter-flexible": "^7.3.0",
+    "sharp": "^0.32.5"
   },
   "devDependencies": {
     "eslint": "^9.9.0",

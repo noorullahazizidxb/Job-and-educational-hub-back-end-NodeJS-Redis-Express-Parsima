@@ -21,6 +21,8 @@ import authRouter from './routes/auth.js';
 import notificationsRouter from './routes/notifications.js';
 import reviewsRouter from './routes/reviews.js';
 import statsRouter from './routes/stats.js';
+import './lib/redis.js';
+import rateLimitMiddleware from './middleware/rateLimit.js';
 import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
 
 const app = express();
@@ -44,6 +46,8 @@ app.use(express.json({ limit: JSON_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: URLENCODED_LIMIT }));
 app.use(morgan('dev'));
 app.use(authenticate);
+// Apply IP-based rate limiting early
+app.use(rateLimitMiddleware);
 app.use(responseEnvelope());
 // static files for uploads - cache aggressively (served via CDN in prod is recommended)
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), { maxAge: '7d', etag: true }));
@@ -104,3 +108,11 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
 });
+
+// Start maintenance scheduler in the main server process so repeatable jobs are created.
+try {
+  // eslint-disable-next-line no-unused-vars
+  import('./queue/cleanupScheduler.js').then(() => console.log('cleanup scheduler initialized')).catch((e) => console.error('failed to init cleanup scheduler', e));
+} catch (e) {
+  // ignore; dynamic import failures should not stop the server
+}

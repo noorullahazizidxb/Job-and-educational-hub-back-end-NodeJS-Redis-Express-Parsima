@@ -1,8 +1,12 @@
 import { prisma } from '../lib/prisma.js';
+import { getJson, setJson } from '../lib/cache.js';
 
 // Returns active jobs count, companies count, average time-to-hire (ms) for hired applications
 export async function overview(_req, res, next) {
   try {
+  const cacheKey = 'stats:overview';
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
     // Active jobs: status != 'closed' (published and draft are considered active here)
     const activeJobsP = prisma.job.count({ where: { status: { not: 'closed' } } });
     const companiesP = prisma.company.count();
@@ -43,7 +47,28 @@ export async function overview(_req, res, next) {
       }
     }
 
-    const [activeJobs, companies] = await Promise.all([activeJobsP, companiesP]);
+    // Also count services by type (procurement, scholarship)
+    const servicesCountP = prisma.service.groupBy({ by: ['type'], _count: { _all: true } }).catch(() => null);
+    const jobApplicationsCountP = prisma.jobApplication.count().catch(() => 0);
+    const serviceApplicationsCountP = prisma.serviceApplication.count().catch(() => 0);
+
+    const [activeJobs, companies, servicesGrouped, jobApplications, serviceApplications] = await Promise.all([
+      activeJobsP,
+      companiesP,
+      servicesCountP,
+      jobApplicationsCountP,
+      serviceApplicationsCountP,
+    ]);
+
+    const services = { procurement: 0, scholarship: 0 };
+    if (Array.isArray(servicesGrouped)) {
+      for (const row of servicesGrouped) {
+        const t = String(row.type);
+        const cnt = Number(row._count?._all ?? row._count ?? 0);
+        if (t === 'procurement') services.procurement = cnt;
+        else if (t === 'scholarship') services.scholarship = cnt;
+      }
+    }
 
     // Format average time according to rules:
     // - if < 1 hour => display ms
@@ -70,11 +95,15 @@ export async function overview(_req, res, next) {
     res.json({
       activeJobs,
       companies,
+      services,
+      jobApplications,
+      serviceApplications,
       hiredApplicationsCount: hiredCount,
       // averageTimeToHire contains the formatted representation according to rules:
       // < 1 hour => ms, < 24 hours => hours, >= 24 hours => days and hours
       averageTimeToHire: formatted,
     });
+  try { await setJson(cacheKey, { activeJobs, companies, services, jobApplications, serviceApplications, hiredApplicationsCount: hiredCount, averageTimeToHire: formatted }, 60); } catch (e) { /* ignore cache errors */ }
   } catch (err) {
     next(err);
   }

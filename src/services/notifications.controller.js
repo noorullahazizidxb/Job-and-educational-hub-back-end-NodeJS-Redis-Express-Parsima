@@ -1,12 +1,16 @@
 import { prisma } from '../lib/prisma.js';
 import { notFound, unauthorized, forbidden } from '../utils/httpError.js';
+import { getJson, setJson, del } from '../lib/cache.js';
 
 export async function list(req, res, next) {
   try {
     const { q } = req.query;
     const where = q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : {};
+  const cacheKey = `notifications:list:${JSON.stringify(req.query || {})}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
 
-    const rows = await prisma.notification.findMany({
+  const rows = await prisma.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -32,14 +36,19 @@ export async function list(req, res, next) {
       })),
     }));
 
-    res.json(items);
+  await setJson(cacheKey, items, 60);
+  res.json(items);
   } catch (err) { next(err); }
 }
 
 export async function detail(req, res, next) {
   try {
     const { id } = req.params;
-    const n = await prisma.notification.findUnique({
+  const cacheKey = `notifications:detail:${id}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const n = await prisma.notification.findUnique({
       where: { id: Number(id) },
       include: {
         createdBy: true,
@@ -57,7 +66,8 @@ export async function detail(req, res, next) {
         userEmail: r.user ? r.user.email : null,
       })),
     };
-    res.json(item);
+  await setJson(cacheKey, item, 120);
+  res.json(item);
   } catch (err) { next(err); }
 }
 
@@ -121,8 +131,10 @@ export async function update(req, res, next) {
       }
       return item;
     });
-
-    res.json(updated);
+  // invalidate public notification caches
+  await del('notifications:list:{}');
+  await del(`notifications:detail:${id}`);
+  res.json(updated);
   } catch (err) { next(err); }
 }
 
@@ -130,7 +142,9 @@ export async function remove(req, res, next) {
   try {
     const { id } = req.params;
     await prisma.notification.delete({ where: { id: Number(id) } });
-    res.status(204).end();
+  await del('notifications:list:{}');
+  await del(`notifications:detail:${id}`);
+  res.status(204).end();
   } catch (err) { next(err); }
 }
 
@@ -150,7 +164,7 @@ export async function myInbox(req, res, next) {
       ...(unreadOnly ? { isRead: false } : {}),
     };
 
-    const rows = await prisma.notificationRecipient.findMany({
+  const rows = await prisma.notificationRecipient.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -171,7 +185,7 @@ export async function myInbox(req, res, next) {
       },
     }));
 
-    res.json(items);
+  res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -193,7 +207,9 @@ export async function markRead(req, res, next) {
       where: { id: rec.id },
       data: { isRead: true, readAt: new Date() },
     });
-    res.json(updated);
+  // invalidate public notifications list cache
+  await del('notifications:list:{}');
+  res.json(updated);
   } catch (err) { next(err); }
 }
 
@@ -208,7 +224,8 @@ export async function markAllRead(req, res, next) {
       data: { isRead: true, readAt: new Date() },
     });
 
-    // result.count is the number of rows updated
-    res.json({ updated: result.count });
+  // invalidate public notifications list cache and return count
+  await del('notifications:list:{}');
+  res.json({ updated: result.count });
   } catch (err) { next(err); }
 }

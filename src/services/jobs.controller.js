@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { httpError, notFound, unauthorized } from '../utils/httpError.js';
+import { getJson, setJson, del } from '../lib/cache.js';
 
 // List jobs by companyId
 export async function listByCompany(req, res, next) {
@@ -39,7 +40,11 @@ export async function list(req, res, next) {
       }
     } catch (e) {}
 
-    const items = await prisma.job.findMany({
+  const cacheKey = `jobs:list:${JSON.stringify(req.query || {})}`;
+  const cached = await getJson(cacheKey);
+  if (cached) return res.json(cached);
+
+  const items = await prisma.job.findMany({
       where,
       orderBy: { postedAt: 'desc' },
       include: {
@@ -89,6 +94,7 @@ export async function list(req, res, next) {
         for (const job of items) job.reviews = [];
       }
     }
+  await setJson(cacheKey, items, 30);
   res.json(items);
   } catch (err) { next(err); }
 }
@@ -249,7 +255,10 @@ export async function create(req, res, next) {
       },
       include: { categories: true },
     });
-    res.status(201).json(job);
+  // Invalidate job lists and company lists
+  await del('jobs:list:{}');
+  await del('companies:list:{}');
+  res.status(201).json(job);
   } catch (err) { next(err); }
 }
 
@@ -286,14 +295,18 @@ export async function update(req, res, next) {
       }
       return updated;
     });
-    res.json(job);
+  await del('jobs:list:{}');
+  await del('companies:list:{}');
+  res.json(job);
   } catch (err) { next(err); }
 }
 
 export async function remove(req, res, next) {
   try {
     const { slug } = req.params;
-    await prisma.job.delete({ where: { slug } });
-    res.status(204).end();
+  await prisma.job.delete({ where: { slug } });
+  await del('jobs:list:{}');
+  await del('companies:list:{}');
+  res.status(204).end();
   } catch (err) { next(err); }
 }
