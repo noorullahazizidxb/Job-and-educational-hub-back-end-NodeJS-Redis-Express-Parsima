@@ -11,39 +11,43 @@ export async function overview(_req, res, next) {
     const activeJobsP = prisma.job.count({ where: { status: { not: 'closed' } } });
     const companiesP = prisma.company.count();
 
-    // For average time to hire, prefer computing in the DB via raw SQL for efficiency.
-    // MySQL: TIMESTAMPDIFF(MICROSECOND, createdAt, updatedAt) gives microseconds; convert to ms.
+    // Compute hired applications count reliably, and compute average time-to-hire via raw SQL for efficiency.
     let avgMs = null;
-    let hiredCount = 0;
+    // Use a direct count for hired applications to avoid driver-parsing issues
+    const hiredCount = await prisma.jobApplication.count({ where: { status: 'hired' } }).catch(() => 0);
     try {
-      const result = await prisma.$queryRaw`
-        SELECT
-          COUNT(*) AS cnt,
-          AVG(TIMESTAMPDIFF(MICROSECOND, createdAt, updatedAt)) / 1000 AS avg_ms
-        FROM JobApplication
-        WHERE status = 'hired' AND updatedAt > createdAt
-      `;
-      // Result shape depends on driver; normalize access
-      if (Array.isArray(result) && result.length) {
-        hiredCount = Number(result[0].cnt || result[0].CNT || result[0].count || 0);
-        const rawAvg = result[0].avg_ms ?? result[0].AVG_MS ?? result[0].avg_ms;
-        avgMs = rawAvg !== null && rawAvg !== undefined ? Number(rawAvg) : null;
-      } else if (result && typeof result === 'object') {
-        hiredCount = Number(result.cnt || result.CNT || result.count || 0);
-        avgMs = result.avg_ms ? Number(result.avg_ms) : null;
+      // raw query returns driver-specific rows; alias columns to predictable names
+      const raw = await prisma.$queryRawUnsafe(
+        "SELECT COUNT(*) AS cnt, AVG(TIMESTAMPDIFF(MICROSECOND, createdAt, updatedAt))/1000 AS avg_ms FROM JobApplication WHERE status = 'hired' AND updatedAt > createdAt"
+      );
+      let row = null;
+      if (Array.isArray(raw) && raw.length) row = raw[0];
+      else if (raw && typeof raw === 'object') row = raw;
+      if (row) {
+        // defensively locate avg value
+        const candidates = Object.entries(row);
+        for (const [k, v] of candidates) {
+          const key = String(k).toLowerCase();
+          if (key.includes('avg') || key.includes('avg_ms') || key.includes('timestampdiff')) {
+            const n = Number(v);
+            if (!Number.isNaN(n)) { avgMs = n; break; }
+          }
+        }
+        // if avg not found but there's a numeric second column, try that
+        if (avgMs === null && candidates.length >= 2) {
+          const maybe = Number(candidates[1][1]);
+          if (!Number.isNaN(maybe)) avgMs = maybe;
+        }
       }
     } catch (e) {
-      // If raw query failed (driver differences), fallback: fetch timestamps and compute in JS (safe but may be memory-heavy)
-      const rows = await prisma.jobApplication.findMany({ where: { status: 'hired', updatedAt: { gt: new Date(0) } }, select: { createdAt: true, updatedAt: true } });
-      hiredCount = rows.length;
-      if (hiredCount) {
-        const totalMs = rows.reduce((sum, r) => {
-          const c = new Date(r.createdAt).getTime();
-          const u = new Date(r.updatedAt).getTime();
-          if (!isFinite(c) || !isFinite(u) || u <= c) return sum;
-          return sum + (u - c);
-        }, 0);
-        avgMs = totalMs / hiredCount;
+      // fallback: compute in JS (safe but may be heavier)
+      const rows = await prisma.jobApplication.findMany({ where: { status: 'hired' }, select: { createdAt: true, updatedAt: true } });
+      if (rows.length) {
+        const good = rows.filter(r => new Date(r.updatedAt).getTime() > new Date(r.createdAt).getTime());
+        if (good.length) {
+          const totalMs = good.reduce((sum, r) => sum + (new Date(r.updatedAt).getTime() - new Date(r.createdAt).getTime()), 0);
+          avgMs = totalMs / good.length;
+        }
       }
     }
 
@@ -60,7 +64,7 @@ export async function overview(_req, res, next) {
       serviceApplicationsCountP,
     ]);
 
-    const services = { procurement: 0, scholarship: 0 };
+  const services = { procurement: 0, scholarship: 0 };
     if (Array.isArray(servicesGrouped)) {
       for (const row of servicesGrouped) {
         const t = String(row.type);
