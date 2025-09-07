@@ -38,21 +38,36 @@ export async function runCleanup(dryRun = false) {
   // Delete JobApplications for jobs that closed before cutoff
   const jobIdsToDelete = (await prisma.job.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true } })).map((j) => j.id);
   if (jobIdsToDelete.length) {
-    // collect and remove CV files referenced by job applications
-    const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true } });
-    const jobAppFiles = jobApps.map((a) => a.cvUrl).filter(Boolean);
-    let deletedFilesCount = 0;
-    for (const f of jobAppFiles) {
+    // collect and remove CV and cover letter files referenced by job applications
+    const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true } });
+    const jobAppCvFiles = jobApps.map((a) => a.cvUrl).filter(Boolean);
+    const jobAppCoverFiles = jobApps.map((a) => a.coverLetter).filter(Boolean);
+    let deletedJobAppCvCount = 0;
+    let deletedJobAppCoverCount = 0;
+    for (const f of jobAppCvFiles) {
       try {
         const p = String(f);
         if (/^https?:\/\//i.test(p)) continue; // external URL
         const abs = path.resolve(process.cwd(), p.replace(/^\//, ''));
         if (fs.existsSync(abs)) {
           if (!dryRun) fs.unlinkSync(abs);
-          deletedFilesCount++;
+          deletedJobAppCvCount++;
         }
       } catch (e) {
-        console.error('failed deleting job application file', f, e?.message || e);
+        console.error('failed deleting job application cv file', f, e?.message || e);
+      }
+    }
+    for (const f of jobAppCoverFiles) {
+      try {
+        const p = String(f);
+        if (/^https?:\/\//i.test(p)) continue; // external URL
+        const abs = path.resolve(process.cwd(), p.replace(/^\//, ''));
+        if (fs.existsSync(abs)) {
+          if (!dryRun) fs.unlinkSync(abs);
+          deletedJobAppCoverCount++;
+        }
+      } catch (e) {
+        console.error('failed deleting job application cover file', f, e?.message || e);
       }
     }
     if (!dryRun) await prisma.jobApplication.deleteMany({ where: { jobId: { in: jobIdsToDelete } } });
@@ -82,6 +97,7 @@ export async function runCleanup(dryRun = false) {
     const svcApps = await prisma.serviceApplication.findMany({ where: { serviceId: { in: serviceIdsToDelete } }, select: { id: true, cvUrl: true } });
     const svcAppFiles = svcApps.map((a) => a.cvUrl).filter(Boolean);
     let deletedSvcFilesCount = 0;
+    let deletedSvcCoverFilesCount = 0;
     for (const f of svcAppFiles) {
       try {
         const p = String(f);
@@ -93,6 +109,21 @@ export async function runCleanup(dryRun = false) {
         }
       } catch (e) {
         console.error('failed deleting service application file', f, e?.message || e);
+      }
+    }
+    // delete coverLetters from service applications if present
+    const svcCoverFiles = svcApps.map((a) => a.coverLetter).filter(Boolean);
+    for (const f of svcCoverFiles) {
+      try {
+        const p = String(f);
+        if (/^https?:\/\//i.test(p)) continue;
+        const abs = path.resolve(process.cwd(), p.replace(/^\//, ''));
+        if (fs.existsSync(abs)) {
+          if (!dryRun) fs.unlinkSync(abs);
+          deletedSvcCoverFilesCount++;
+        }
+      } catch (e) {
+        console.error('failed deleting service application cover file', f, e?.message || e);
       }
     }
     // collect service documents (JSON) that may reference uploaded files
@@ -132,7 +163,7 @@ export async function runCleanup(dryRun = false) {
         }
       }
     }
-    if (!dryRun) await prisma.serviceApplication.deleteMany({ where: { serviceId: { in: serviceIdsToDelete } } });
+  if (!dryRun) await prisma.serviceApplication.deleteMany({ where: { serviceId: { in: serviceIdsToDelete } } });
   }
 
   // Delete jobs themselves
@@ -157,8 +188,10 @@ export async function runCleanup(dryRun = false) {
     deletedCompanies: 0, // returned for compatibility; calculated above if needed
     // file deletion counters (approx)
     deletedFiles: {
-      jobApplicationCvs: typeof deletedFilesCount === 'number' ? deletedFilesCount : 0,
+      jobApplicationCvs: typeof deletedJobAppCvCount === 'number' ? deletedJobAppCvCount : 0,
+      jobApplicationCoverLetters: typeof deletedJobAppCoverCount === 'number' ? deletedJobAppCoverCount : 0,
       serviceApplicationCvs: typeof deletedSvcFilesCount === 'number' ? deletedSvcFilesCount : 0,
+      serviceApplicationCoverLetters: typeof deletedSvcCoverFilesCount === 'number' ? deletedSvcCoverFilesCount : 0,
       serviceDocuments: typeof deletedServiceDocFiles === 'number' ? deletedServiceDocFiles : 0,
       companyLogos: typeof deletedCompanyLogos === 'number' ? deletedCompanyLogos : 0,
     }

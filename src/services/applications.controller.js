@@ -19,35 +19,38 @@ export async function applyToJob(req, res, next) {
       userId: userId,
       fullName: applicant.name || applicant.email,
       email: applicant.email,
-      cvUrl: cv ? `/uploads/${cv.filename}` : body.cvUrl,
-      coverLetter: cover ? `/uploads/${cover.filename}` : body.coverLetter,
       answers: body.answers ? tryParseJSON(body.answers) : undefined,
     };
-  const item = await prisma.jobApplication.create({ data });
-  // invalidate relevant caches
-  await del('jobApplications:list:{}');
-  await del('jobs:list:{}');
-  res.status(201).json(item);
+    // set cvUrl/coverLetter only when upload present or non-empty body value
+    if (cv) data.cvUrl = `/uploads/${cv.filename}`;
+    else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
+    if (cover) data.coverLetter = `/uploads/${cover.filename}`;
+    else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
+    const item = await prisma.jobApplication.create({ data });
+    // invalidate relevant caches
+    await del('jobApplications:list:{}');
+    await del('jobs:list:{}');
+    res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
 export async function listJobApplications(req, res, next) {
   try {
-  const { jobId, userId, status } = req.query;
-  const where = {
+    const { jobId, userId, status } = req.query;
+    const where = {
       AND: [
         jobId ? { jobId: Number(jobId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
       ],
     };
-  const cacheKey = `jobApplications:list:${JSON.stringify(req.query || {})}`;
-  const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
+    const cacheKey = `jobApplications:list:${JSON.stringify(req.query || {})}`;
+    const cached = await getJson(cacheKey);
+    if (cached) return res.json(cached);
 
-  const items = await prisma.jobApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { job: true, user: true } });
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+    const items = await prisma.jobApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { job: true, user: true } });
+    await setJson(cacheKey, items, 30);
+    res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -67,14 +70,16 @@ export async function applyToService(req, res, next) {
       userId: userId,
       fullName: applicant.name || applicant.email,
       email: applicant.email,
-      cvUrl: cv ? `/uploads/${cv.filename}` : body.cvUrl,
-      coverLetter: cover ? `/uploads/${cover.filename}` : body.coverLetter,
     };
-  const item = await prisma.serviceApplication.create({ data });
-  // invalidate relevant caches
-  await del('serviceApplications:list:{}');
-  await del('services:list:{}');
-  res.status(201).json(item);
+    if (cv) data.cvUrl = `/uploads/${cv.filename}`;
+    else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
+    if (cover) data.coverLetter = `/uploads/${cover.filename}`;
+    else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
+    const item = await prisma.serviceApplication.create({ data });
+    // invalidate relevant caches
+    await del('serviceApplications:list:{}');
+    await del('services:list:{}');
+    res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
@@ -84,20 +89,20 @@ function tryParseJSON(s) {
 
 export async function listServiceApplications(req, res, next) {
   try {
-  const { serviceId, userId, status } = req.query;
-  const where = {
+    const { serviceId, userId, status } = req.query;
+    const where = {
       AND: [
         serviceId ? { serviceId: Number(serviceId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
       ],
     };
-  const cacheKey = `serviceApplications:list:${JSON.stringify(req.query || {})}`;
-  const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
-  const items = await prisma.serviceApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { service: true, user: true } });
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+    const cacheKey = `serviceApplications:list:${JSON.stringify(req.query || {})}`;
+    const cached = await getJson(cacheKey);
+    if (cached) return res.json(cached);
+    const items = await prisma.serviceApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { service: true, user: true } });
+    await setJson(cacheKey, items, 30);
+    res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -130,13 +135,13 @@ async function _updateJobApplicationStatus(req, res, next, status) {
       const cid = Number(req.user.companyId) || null;
       if (!cid || app.job.companyId !== cid) return next(forbidden());
     }
-  const updated = await prisma.jobApplication.update({ where: { id }, data: { status }, include: { job: true, user: true } });
+    const updated = await prisma.jobApplication.update({ where: { id }, data: { status }, include: { job: true, user: true } });
     const title = `updates on ${updated.job.title}`;
     const body = `your application for (${updated.job.title}) has been ${status}`;
     await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
-  // invalidate caches that may list applications
-  await del('jobApplications:list:{}');
-  await del(`jobApplications:detail:${id}`);
+    // invalidate caches that may list applications
+    await del('jobApplications:list:{}');
+    await del(`jobApplications:detail:${id}`);
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -160,13 +165,13 @@ async function _updateServiceApplicationStatus(req, res, next, status) {
       const cid = Number(req.user.companyId) || null;
       if (!cid || app.service.companyId !== cid) return next(forbidden());
     }
-  const updated = await prisma.serviceApplication.update({ where: { id }, data: { status }, include: { service: true, user: true } });
+    const updated = await prisma.serviceApplication.update({ where: { id }, data: { status }, include: { service: true, user: true } });
     const title = `updates on ${updated.service.title}`;
     const body = `your application for (${updated.service.title}) has been ${status}`;
     await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
-  // invalidate caches that may list service applications
-  await del('serviceApplications:list:{}');
-  await del(`serviceApplications:detail:${id}`);
+    // invalidate caches that may list service applications
+    await del('serviceApplications:list:{}');
+    await del(`serviceApplications:detail:${id}`);
     res.json(updated);
   } catch (err) { next(err); }
 }

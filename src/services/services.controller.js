@@ -12,10 +12,10 @@ export async function listByCompany(req, res, next) {
       include: {
         company: true,
         city: true,
-  applications: { include: { user: true } },
+        applications: { include: { user: true } },
       },
     });
-  res.json(items);
+    res.json(items);
   } catch (err) { next(err); }
 }
 import { prisma } from '../lib/prisma.js';
@@ -26,7 +26,7 @@ export async function list(req, res, next) {
     const { q, type, status, cityId } = req.query;
     const where = {
       AND: [
-        q ? { OR: [ { title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } } ] } : {},
+        q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } }] } : {},
         type ? { type } : {},
         status ? { status } : {},
         cityId ? { cityId: Number(cityId) } : {},
@@ -41,13 +41,13 @@ export async function list(req, res, next) {
         if (!cid) return res.json([]);
         where.AND.push({ companyId: cid });
       }
-    } catch (e) {}
+    } catch (e) { }
 
-  const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
-  const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
+    const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
+    const cached = await getJson(cacheKey);
+    if (cached) return res.json(cached);
 
-  const items = await prisma.service.findMany({
+    const items = await prisma.service.findMany({
       where,
       orderBy: { postedAt: 'desc' },
       include: {
@@ -56,18 +56,18 @@ export async function list(req, res, next) {
         applications: { include: { user: { select: { id: true, name: true, email: true, photo: true } } } },
       },
     });
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+    await setJson(cacheKey, items, 30);
+    res.json(items);
   } catch (err) { next(err); }
 }
 
 export async function featured(req, res, next) {
   try {
-  const cacheKey = 'services:featured:{}';
-  const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
+    const cacheKey = 'services:featured:{}';
+    const cached = await getJson(cacheKey);
+    if (cached) return res.json(cached);
 
-  const items = await prisma.service.findMany({
+    const items = await prisma.service.findMany({
       where: { featured: true },
       orderBy: { postedAt: 'desc' },
       include: {
@@ -76,8 +76,8 @@ export async function featured(req, res, next) {
         applications: { include: { user: true } },
       },
     });
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+    await setJson(cacheKey, items, 30);
+    res.json(items);
   } catch (err) { next(err); }
 }
 
@@ -88,15 +88,15 @@ export async function detail(req, res, next) {
     const cached = await getJson(cacheKey);
     if (cached) return res.json(cached);
 
-  const item = await prisma.service.findUnique({
-    where: { slug },
-    include: {
-      company: true,
-      city: true,
-  applications: { include: { user: true } },
-    },
-  });
-  if (!item) return next(notFound());
+    const item = await prisma.service.findUnique({
+      where: { slug },
+      include: {
+        company: true,
+        city: true,
+        applications: { include: { user: true } },
+      },
+    });
+    if (!item) return next(notFound());
     await setJson(cacheKey, item, 60);
     res.json(item);
   } catch (err) { next(err); }
@@ -106,15 +106,21 @@ export async function create(req, res, next) {
   try {
     const files = req.files || [];
     const body = req.body || {};
-    const data = { ...body };
+    // build data explicitly to avoid accidentally overwriting document files when body.documents is empty
+    const data = {};
+    // copy allowed non-file fields from body
+    for (const k of Object.keys(body || {})) {
+      if (k === 'documents') continue; // skip documents here; handled from uploaded files only
+      data[k] = body[k];
+    }
     if (files && files.length) {
       // store file paths under documents as array of URLs
       data.documents = files.map((f) => `/uploads/services/${f.filename}`);
     }
     const item = await prisma.service.create({ data });
-  await del('services:list:{}');
-  await del('services:featured:{}');
-  res.status(201).json(item);
+    await del('services:list:{}');
+    await del('services:featured:{}');
+    res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
@@ -123,7 +129,12 @@ export async function update(req, res, next) {
     const { slug } = req.params;
     const files = req.files || [];
     const body = req.body || {};
-    const data = { ...body };
+    // Build data explicitly and skip `documents` unless new files are provided.
+    const data = {};
+    for (const k of Object.keys(body || {})) {
+      if (k === 'documents') continue; // documents handled from uploaded files only
+      data[k] = body[k];
+    }
     if (files && files.length) {
       // delete previous documents (if any)
       try {
@@ -141,10 +152,10 @@ export async function update(req, res, next) {
       data.documents = files.map((f) => `/uploads/services/${f.filename}`);
     }
     const item = await prisma.service.update({ where: { slug }, data });
-  await del('services:list:{}');
-  await del('services:featured:{}');
-  await del(`service:detail:${slug}`);
-  res.json(item);
+    await del('services:list:{}');
+    await del('services:featured:{}');
+    await del(`service:detail:${slug}`);
+    res.json(item);
   } catch (err) { next(err); }
 }
 
@@ -152,9 +163,9 @@ export async function remove(req, res, next) {
   try {
     const { slug } = req.params;
     await prisma.service.delete({ where: { slug } });
-  await del('services:list:{}');
-  await del('services:featured:{}');
-  await del(`service:detail:${slug}`);
-  res.status(204).end();
+    await del('services:list:{}');
+    await del('services:featured:{}');
+    await del(`service:detail:${slug}`);
+    res.status(204).end();
   } catch (err) { next(err); }
 }
