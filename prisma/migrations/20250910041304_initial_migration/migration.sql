@@ -16,6 +16,7 @@ CREATE TABLE `Company` (
 
     UNIQUE INDEX `Company_slug_key`(`slug`),
     INDEX `Company_name_idx`(`name`),
+    INDEX `Company_cityId_idx`(`cityId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -54,6 +55,9 @@ CREATE TABLE `Job` (
     UNIQUE INDEX `Job_slug_key`(`slug`),
     INDEX `Job_title_location_type_idx`(`title`, `location`, `type`),
     INDEX `Job_status_closingDate_idx`(`status`, `closingDate`),
+    INDEX `Job_companyId_idx`(`companyId`),
+    INDEX `Job_cityId_idx`(`cityId`),
+    INDEX `Job_postedAt_idx`(`postedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -131,6 +135,8 @@ CREATE TABLE `Service` (
 
     UNIQUE INDEX `Service_slug_key`(`slug`),
     INDEX `Service_type_status_closingDate_idx`(`type`, `status`, `closingDate`),
+    INDEX `Service_companyId_idx`(`companyId`),
+    INDEX `Service_cityId_idx`(`cityId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -151,6 +157,7 @@ CREATE TABLE `User` (
     `address` VARCHAR(191) NULL,
 
     UNIQUE INDEX `User_email_key`(`email`),
+    INDEX `User_companyId_idx`(`companyId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -203,6 +210,7 @@ CREATE TABLE `JobApplication` (
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `JobApplication_jobId_status_idx`(`jobId`, `status`),
+    INDEX `JobApplication_userId_idx`(`userId`),
     UNIQUE INDEX `JobApplication_jobId_userId_key`(`jobId`, `userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -221,6 +229,7 @@ CREATE TABLE `ServiceApplication` (
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `ServiceApplication_serviceId_status_idx`(`serviceId`, `status`),
+    INDEX `ServiceApplication_userId_idx`(`userId`),
     UNIQUE INDEX `ServiceApplication_serviceId_userId_key`(`serviceId`, `userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
