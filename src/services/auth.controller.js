@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { signToken } from '../utils/jwt.js';
 import { httpError } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { incrementMetricAllPeriods } from '../lib/metrics.js';
 
 export async function login(req, res, next) {
   try {
@@ -16,6 +17,8 @@ export async function login(req, res, next) {
       const { passwordHash, ...safeUser } = user;
       // ensure any cached `me` is refreshed after login
       try { await del(`auth:me:${user.id}`); } catch (e) { /* ignore cache errors */ }
+      // count successful login
+      try { await incrementMetricAllPeriods('metrics:auth:logins'); } catch (e) { /* ignore metrics errors */ }
       res.json({ token, user: safeUser });
   } catch (err) { next(err); }
 }

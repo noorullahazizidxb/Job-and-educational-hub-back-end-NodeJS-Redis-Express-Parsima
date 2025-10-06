@@ -12,7 +12,8 @@ router.get('/', requireAdmin(), validate(listUsersSchema, 'query'), UsersControl
 // that creating non-'common' roles requires an admin.
 router.post('/', uploadProfile.single('photo'), validate(createUserSchema), UsersController.create);
 router.get('/:id', requireAdmin(), UsersController.detail);
-router.patch('/:id', requireAdmin(), uploadProfile.single('photo'), validate(updateUserSchema), UsersController.update);
+// Allow authenticated users to patch their own profile; controller will enforce admin vs self-only permissions
+router.patch('/:id', uploadProfile.single('photo'), validate(updateUserSchema), UsersController.update);
 router.delete('/:id', requireAdmin(), UsersController.remove);
 
 export default router;

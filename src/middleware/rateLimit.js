@@ -1,7 +1,15 @@
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import Redis from 'ioredis';
 
-const redisClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const redisPassword = process.env.REDIS_PASSWORD || undefined;
+let redisClient;
+if (redisPassword) {
+  const url = new URL(redisUrl);
+  redisClient = new Redis({ host: url.hostname, port: Number(url.port) || 6379, password: redisPassword });
+} else {
+  redisClient = new Redis(redisUrl);
+}
 
 // Default global limiter: Allow 100 requests per IP/user per 60 seconds (tunable via env)
 const points = Number(process.env.RATE_LIMIT_POINTS) || 100;

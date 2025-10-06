@@ -198,6 +198,13 @@ DELETE {{base}}/api/jobs/{{qaJobSlug}}
 Authorization: Bearer {{companyToken}}
 
 ### Jobs: Add Review to seeded job (authenticated user)
+##############################
+# Reports
+##############################
+
+### Reports: Overview (daily, weekly, monthly + timeseries)
+GET {{base}}/api/reports
+
 POST {{base}}/api/jobs/frontend-developer-acme/reviews
 Authorization: Bearer {{commonToken}}
 Content-Type: application/json

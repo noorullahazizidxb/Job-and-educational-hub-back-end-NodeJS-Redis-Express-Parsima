@@ -166,14 +166,24 @@ export async function update(req, res, next) {
     const files = req.files || {};
     const photoFile = req.file || files.photo?.[0];
 
+    // Authorization: only admins can update anyone; other users can only update themselves
+    const requester = req.user;
+    if (!requester) return next(unauthorized('Authentication required to update user'));
+    const requesterId = Number(requester.id ?? requester.sub);
+    const targetId = Number(id);
+    const isAdmin = requester.role === 'admin';
+    if (!isAdmin && requesterId !== targetId) return next(forbidden('You may only update your own profile'));
+
+    // Build payload but restrict role/companyId changes for non-admins
     const payload = {
       email: body.email,
       name: body.name,
-      role: body.role,
-      companyId: body.companyId ? Number(body.companyId) : null,
+      // role change only allowed by admins
+      role: isAdmin ? body.role : undefined,
+      companyId: isAdmin ? (body.companyId ? Number(body.companyId) : null) : undefined,
       about: body.about ?? null,
-  // Accept skills as either an array or a comma-separated string. Store as CSV string.
-  skills: Array.isArray(body.skills) ? body.skills.join(',') : (body.skills ?? null),
+      // Accept skills as either an array or a comma-separated string. Store as CSV string.
+      skills: Array.isArray(body.skills) ? body.skills.join(',') : (body.skills ?? null),
       phone: body.phone ?? null,
       address: body.address ?? null,
     };
@@ -196,6 +206,9 @@ export async function update(req, res, next) {
     } else if (body.passwordHash) {
       payload.passwordHash = body.passwordHash;
     }
+
+  // Remove undefined keys from payload so we don't overwrite restricted fields
+  Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k]; });
 
   const item = await prisma.user.update({ where: { id: Number(id) }, data: payload });
   if (photoFile) {

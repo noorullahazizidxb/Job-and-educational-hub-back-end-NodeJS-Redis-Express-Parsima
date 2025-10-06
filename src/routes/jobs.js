@@ -2,11 +2,22 @@ import { Router } from 'express';
 import * as JobsController from '../services/jobs.controller.js';
 import { validate } from '../utils/validate.js';
 import { createJobSchema, updateJobSchema, listJobsSchema, createJobReviewSchema } from '../validation/jobs.schema.js';
+import { incrementMetricAllPeriods } from '../lib/metrics.js';
 import { requireRole, requireAdmin } from '../middleware/authz.js';
 
 const router = Router();
 
-router.get('/', validate(listJobsSchema, 'query'), JobsController.list);
+// Track viewers: every GET /api/jobs increments a Redis-based counter with 1-year TTL
+router.get('/', async (req, res, next) => {
+	try {
+		// Increment counters for job viewers
+		await incrementMetricAllPeriods('metrics:jobs:viewers');
+	} catch (e) { /* ignore metrics errors */ }
+	return validate(listJobsSchema, 'query')(req, res, (err) => {
+		if (err) return next(err);
+		return JobsController.list(req, res, next);
+	});
+});
 // Featured jobs (full relations like list/detail)
 router.get('/featured', JobsController.featured);
 // Get jobs by companyId
