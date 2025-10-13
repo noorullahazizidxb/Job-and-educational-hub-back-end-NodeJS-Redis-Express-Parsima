@@ -11,12 +11,14 @@
     "seed": "prisma db seed",
     "lint": "eslint .",
     "worker": "node ./src/queue/imageProcessor.js",
-    "cleanup": "node ./src/queue/dailyCleanup.js"
+    "cleanup": "node ./src/queue/dailyCleanup.js",
+    "check:services": "node -r dotenv/config ./scripts/check-connectivity.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^9.1.1",
     "@prisma/client": "^6.15.0",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.58.5",
