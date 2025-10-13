@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { unauthorized, forbidden, notFound } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { indexJobApplicationById, indexServiceApplicationById } from '../lib/searchIndexer.js';
 
 export async function applyToJob(req, res, next) {
   try {
@@ -26,22 +27,24 @@ export async function applyToJob(req, res, next) {
     else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
     if (cover) data.coverLetter = `/uploads/${cover.filename}`;
     else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
-    const item = await prisma.jobApplication.create({ data });
+  const item = await prisma.jobApplication.create({ data });
     // invalidate relevant caches
     await del('jobApplications:list:{}');
     await del('jobs:list:{}');
+  try { await indexJobApplicationById(item.id); } catch {}
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
 export async function listJobApplications(req, res, next) {
   try {
-    const { jobId, userId, status } = req.query;
+    const { jobId, userId, status, q } = req.query;
     const where = {
       AND: [
         jobId ? { jobId: Number(jobId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
+        q ? { OR: [ { fullName: { contains: q } }, { email: { contains: q } } ] } : {},
       ],
     };
     const cacheKey = `jobApplications:list:${JSON.stringify(req.query || {})}`;
@@ -75,10 +78,11 @@ export async function applyToService(req, res, next) {
     else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
     if (cover) data.coverLetter = `/uploads/${cover.filename}`;
     else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
-    const item = await prisma.serviceApplication.create({ data });
+  const item = await prisma.serviceApplication.create({ data });
     // invalidate relevant caches
     await del('serviceApplications:list:{}');
     await del('services:list:{}');
+  try { await indexServiceApplicationById(item.id); } catch {}
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -89,12 +93,13 @@ function tryParseJSON(s) {
 
 export async function listServiceApplications(req, res, next) {
   try {
-    const { serviceId, userId, status } = req.query;
+    const { serviceId, userId, status, q } = req.query;
     const where = {
       AND: [
         serviceId ? { serviceId: Number(serviceId) } : {},
         userId ? { userId: Number(userId) } : {},
         status ? { status } : {},
+        q ? { OR: [ { fullName: { contains: q } }, { email: { contains: q } } ] } : {},
       ],
     };
     const cacheKey = `serviceApplications:list:${JSON.stringify(req.query || {})}`;
@@ -135,13 +140,14 @@ async function _updateJobApplicationStatus(req, res, next, status) {
       const cid = Number(req.user.companyId) || null;
       if (!cid || app.job.companyId !== cid) return next(forbidden());
     }
-    const updated = await prisma.jobApplication.update({ where: { id }, data: { status }, include: { job: true, user: true } });
+  const updated = await prisma.jobApplication.update({ where: { id }, data: { status }, include: { job: true, user: true } });
     const title = `updates on ${updated.job.title}`;
     const body = `your application for (${updated.job.title}) has been ${status}`;
     await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
     // invalidate caches that may list applications
     await del('jobApplications:list:{}');
     await del(`jobApplications:detail:${id}`);
+  try { await indexJobApplicationById(id); } catch {}
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -165,13 +171,14 @@ async function _updateServiceApplicationStatus(req, res, next, status) {
       const cid = Number(req.user.companyId) || null;
       if (!cid || app.service.companyId !== cid) return next(forbidden());
     }
-    const updated = await prisma.serviceApplication.update({ where: { id }, data: { status }, include: { service: true, user: true } });
+  const updated = await prisma.serviceApplication.update({ where: { id }, data: { status }, include: { service: true, user: true } });
     const title = `updates on ${updated.service.title}`;
     const body = `your application for (${updated.service.title}) has been ${status}`;
     await createApplicationNotification({ title, body, createdById: req.user.id, userId: updated.userId });
     // invalidate caches that may list service applications
     await del('serviceApplications:list:{}');
     await del(`serviceApplications:detail:${id}`);
+  try { await indexServiceApplicationById(id); } catch {}
     res.json(updated);
   } catch (err) { next(err); }
 }

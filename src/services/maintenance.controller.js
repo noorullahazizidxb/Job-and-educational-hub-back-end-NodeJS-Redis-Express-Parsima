@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { backfillAllIndices } from '../lib/searchIndexer.js';
 
 // DELETE expired jobs and services and their dependent records.
 // Query params:
@@ -89,4 +90,13 @@ function toBool(v) {
   if (typeof v === 'boolean') return v;
   if (typeof v === 'string') return ['true', '1', 'yes', 'on'].includes(v.toLowerCase());
   return false;
+}
+
+export async function reindexAll(_req, res, next) {
+  try {
+    const result = await backfillAllIndices();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
 }

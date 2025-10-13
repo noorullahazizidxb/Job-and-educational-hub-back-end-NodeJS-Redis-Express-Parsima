@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
 import { enqueueProfileOptimization } from '../middleware/upload.js';
+import { indexUserById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
 
 export async function list(req, res, next) {
   try {
@@ -155,6 +156,7 @@ export async function create(req, res, next) {
     try { enqueueProfileOptimization(req, photoFile); } catch (e) { /* ignore */ }
   }
   await del('users:list:{}');
+  try { await indexUserById(item.id); } catch {}
   res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -216,6 +218,7 @@ export async function update(req, res, next) {
   }
   await del('users:list:{}');
   await del(`users:detail:${id}`);
+  try { await indexUserById(item.id); } catch {}
   res.json(item);
   } catch (err) { next(err); }
 }
@@ -235,6 +238,7 @@ export async function remove(req, res, next) {
   await prisma.user.delete({ where: { id: Number(id) } });
   await del('users:list:{}');
   await del(`users:detail:${id}`);
+  try { await deleteFromIndex(INDEX.users, Number(id)); } catch {}
   res.status(204).end();
   } catch (err) { next(err); }
 }

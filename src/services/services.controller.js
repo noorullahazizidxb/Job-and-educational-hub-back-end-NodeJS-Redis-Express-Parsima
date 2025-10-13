@@ -20,13 +20,15 @@ export async function listByCompany(req, res, next) {
 }
 import { prisma } from '../lib/prisma.js';
 import { notFound } from '../utils/httpError.js';
+import { indexServiceById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
+import { isSearchEnabled, getEsClient } from '../lib/elasticsearch.js';
 
 export async function list(req, res, next) {
   try {
     const { q, type, status, cityId } = req.query;
     const where = {
       AND: [
-        q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } }] } : {},
+        !q || !isSearchEnabled() ? (q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } }] } : {}) : {},
         type ? { type } : {},
         status ? { status } : {},
         cityId ? { cityId: Number(cityId) } : {},
@@ -47,6 +49,18 @@ export async function list(req, res, next) {
     const cached = await getJson(cacheKey);
     if (cached) return res.json(cached);
 
+    let esOrderedIds = null;
+    if (q && isSearchEnabled()) {
+      try {
+        const client = await getEsClient();
+        const resp = await client.search({ index: 'services', size: 100, query: { multi_match: { query: q, fields: ['title^3','description','tags','organization'] } } });
+        const ids = (resp?.hits?.hits || []).map(h => Number(h._source?.id)).filter(Boolean);
+        if (!ids.length) { await setJson(cacheKey, [], 10); return res.json([]); }
+        esOrderedIds = ids;
+        where.AND.push({ id: { in: ids } });
+      } catch {}
+    }
+
     const items = await prisma.service.findMany({
       where,
       orderBy: { postedAt: 'desc' },
@@ -56,6 +70,10 @@ export async function list(req, res, next) {
         applications: { include: { user: { select: { id: true, name: true, email: true, photo: true } } } },
       },
     });
+    if (esOrderedIds) {
+      const order = new Map(esOrderedIds.map((id, i) => [id, i]));
+      items.sort((a, b) => (order.get(a.id) ?? 999999) - (order.get(b.id) ?? 999999));
+    }
     await setJson(cacheKey, items, 30);
     res.json(items);
   } catch (err) { next(err); }
@@ -120,6 +138,7 @@ export async function create(req, res, next) {
     const item = await prisma.service.create({ data });
     await del('services:list:{}');
     await del('services:featured:{}');
+    try { await indexServiceById(item.id); } catch {}
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -155,6 +174,7 @@ export async function update(req, res, next) {
     await del('services:list:{}');
     await del('services:featured:{}');
     await del(`service:detail:${slug}`);
+    try { await indexServiceById(item.id); } catch {}
     res.json(item);
   } catch (err) { next(err); }
 }
@@ -162,10 +182,12 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const { slug } = req.params;
-    await prisma.service.delete({ where: { slug } });
+      const existing = await prisma.service.findUnique({ where: { slug }, select: { id: true } });
+      await prisma.service.delete({ where: { slug } });
     await del('services:list:{}');
     await del('services:featured:{}');
     await del(`service:detail:${slug}`);
+      try { if (existing) await deleteFromIndex(INDEX.services, existing.id); } catch {}
     res.status(204).end();
   } catch (err) { next(err); }
 }

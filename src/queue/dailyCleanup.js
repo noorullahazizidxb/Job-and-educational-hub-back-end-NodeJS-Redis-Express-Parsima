@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { reindexAfterCleanup } from '../lib/searchIndexer.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -37,9 +38,11 @@ export async function runCleanup(dryRun = false) {
 
   // Delete JobApplications for jobs that closed before cutoff
   const jobIdsToDelete = (await prisma.job.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true } })).map((j) => j.id);
+  let deletedJobAppIds = [];
   if (jobIdsToDelete.length) {
     // collect and remove CV and cover letter files referenced by job applications
-    const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true } });
+  const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true } });
+  deletedJobAppIds = jobApps.map(a => a.id);
     const jobAppCvFiles = jobApps.map((a) => a.cvUrl).filter(Boolean);
     const jobAppCoverFiles = jobApps.map((a) => a.coverLetter).filter(Boolean);
     let deletedJobAppCvCount = 0;
@@ -70,7 +73,7 @@ export async function runCleanup(dryRun = false) {
         console.error('failed deleting job application cover file', f, e?.message || e);
       }
     }
-    if (!dryRun) await prisma.jobApplication.deleteMany({ where: { jobId: { in: jobIdsToDelete } } });
+  if (!dryRun) await prisma.jobApplication.deleteMany({ where: { jobId: { in: jobIdsToDelete } } });
     // delete job reviews and job-category relations to avoid FK constraints
     let deletedJobReviews = 0;
     let deletedJobCategories = 0;
@@ -92,9 +95,11 @@ export async function runCleanup(dryRun = false) {
 
   // Delete Services' applications for services closed before cutoff
   const serviceIdsToDelete = (await prisma.service.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true } })).map((s) => s.id);
+  let deletedServiceAppIds = [];
   if (serviceIdsToDelete.length) {
     // collect and remove CV files referenced by service applications
-    const svcApps = await prisma.serviceApplication.findMany({ where: { serviceId: { in: serviceIdsToDelete } }, select: { id: true, cvUrl: true } });
+  const svcApps = await prisma.serviceApplication.findMany({ where: { serviceId: { in: serviceIdsToDelete } }, select: { id: true, cvUrl: true } });
+  deletedServiceAppIds = svcApps.map(a => a.id);
     const svcAppFiles = svcApps.map((a) => a.cvUrl).filter(Boolean);
     let deletedSvcFilesCount = 0;
     let deletedSvcCoverFilesCount = 0;
@@ -168,7 +173,7 @@ export async function runCleanup(dryRun = false) {
 
   // Delete jobs themselves
   if (jobIdsToDelete.length) {
-  if (!dryRun) await prisma.job.deleteMany({ where: { id: { in: jobIdsToDelete } } });
+    if (!dryRun) await prisma.job.deleteMany({ where: { id: { in: jobIdsToDelete } } });
   }
 
   // Delete services themselves
@@ -178,11 +183,11 @@ export async function runCleanup(dryRun = false) {
 
   // Companies are excluded from automatic deletion — nothing to do here
 
-  return {
+  const result = {
     closedJobs: jobsToClose.length,
     closedServices: servicesToClose.length,
-    deletedJobApplications: jobIdsToDelete.length,
-    deletedServiceApplications: serviceIdsToDelete.length,
+    deletedJobApplications: deletedJobAppIds.length,
+    deletedServiceApplications: deletedServiceAppIds.length,
     deletedJobs: jobIdsToDelete.length,
     deletedServices: serviceIdsToDelete.length,
     deletedCompanies: 0, // returned for compatibility; calculated above if needed
@@ -193,9 +198,23 @@ export async function runCleanup(dryRun = false) {
       serviceApplicationCvs: typeof deletedSvcFilesCount === 'number' ? deletedSvcFilesCount : 0,
       serviceApplicationCoverLetters: typeof deletedSvcCoverFilesCount === 'number' ? deletedSvcCoverFilesCount : 0,
       serviceDocuments: typeof deletedServiceDocFiles === 'number' ? deletedServiceDocFiles : 0,
-      companyLogos: typeof deletedCompanyLogos === 'number' ? deletedCompanyLogos : 0,
+      companyLogos: 0,
     }
   };
+
+  // Trigger ES reindex deletions and refresh
+  try {
+    await reindexAfterCleanup({
+      deletedJobs: jobIdsToDelete,
+      deletedServices: serviceIdsToDelete,
+      deletedJobApplications: deletedJobAppIds,
+      deletedServiceApplications: deletedServiceAppIds,
+    });
+  } catch (e) {
+    console.error('search reindexAfterCleanup failed', e?.message || e);
+  }
+
+  return result;
 }
 
 // If run directly, execute once (dryRun=false) and exit

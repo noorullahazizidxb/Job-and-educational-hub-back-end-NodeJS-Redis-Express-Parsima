@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { notFound, unauthorized, forbidden } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { notifyUserInbox, notifyCompanyInbox } from '../lib/ws.js';
 
 export async function list(req, res, next) {
   try {
@@ -109,7 +110,13 @@ export async function create(req, res, next) {
 
       return tx.notification.findUnique({ where: { id: notification.id }, include: { recipients: true } });
     });
-
+    try {
+      // Push to rooms for each recipient
+      for (const r of result.recipients || []) {
+        if (r.userId) notifyUserInbox(r.userId, { type: 'created', notificationId: result.id });
+        if (r.companyId) notifyCompanyInbox(r.companyId, { type: 'created', notificationId: result.id });
+      }
+    } catch {}
     res.status(201).json(result);
   } catch (err) { next(err); }
 }
@@ -134,6 +141,15 @@ export async function update(req, res, next) {
   // invalidate public notification caches
   await del('notifications:list:{}');
   await del(`notifications:detail:${id}`);
+  try {
+    // Send a generic update event; recipients might have changed
+    // Emit to all roles/users interested: we only emit to explicit recipients after update
+    const recs = await prisma.notificationRecipient.findMany({ where: { notificationId: Number(id) } });
+    for (const r of recs) {
+      if (r.userId) notifyUserInbox(r.userId, { type: 'updated', notificationId: Number(id) });
+      if (r.companyId) notifyCompanyInbox(r.companyId, { type: 'updated', notificationId: Number(id) });
+    }
+  } catch {}
   res.json(updated);
   } catch (err) { next(err); }
 }
@@ -144,6 +160,13 @@ export async function remove(req, res, next) {
     await prisma.notification.delete({ where: { id: Number(id) } });
   await del('notifications:list:{}');
   await del(`notifications:detail:${id}`);
+    try {
+      const recs = await prisma.notificationRecipient.findMany({ where: { notificationId: Number(id) } });
+      for (const r of recs) {
+        if (r.userId) notifyUserInbox(r.userId, { type: 'deleted', notificationId: Number(id) });
+        if (r.companyId) notifyCompanyInbox(r.companyId, { type: 'deleted', notificationId: Number(id) });
+      }
+    } catch {}
   res.status(204).end();
   } catch (err) { next(err); }
 }
@@ -209,6 +232,10 @@ export async function markRead(req, res, next) {
     });
   // invalidate public notifications list cache
   await del('notifications:list:{}');
+  try {
+    if (rec.userId) notifyUserInbox(rec.userId, { type: 'read', recipientId: rec.id });
+    if (rec.companyId) notifyCompanyInbox(rec.companyId, { type: 'read', recipientId: rec.id });
+  } catch {}
   res.json(updated);
   } catch (err) { next(err); }
 }
@@ -226,6 +253,7 @@ export async function markAllRead(req, res, next) {
 
   // invalidate public notifications list cache and return count
   await del('notifications:list:{}');
+  try { notifyUserInbox(userId, { type: 'read-all' }); } catch {}
   res.json({ updated: result.count });
   } catch (err) { next(err); }
 }

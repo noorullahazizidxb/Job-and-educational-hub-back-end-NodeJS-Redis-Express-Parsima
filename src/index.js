@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import compression from 'compression';
 import cors from 'cors';
@@ -25,6 +26,8 @@ import reportsRouter from './routes/reports.js';
 import './lib/redis.js';
 import rateLimitMiddleware from './middleware/rateLimit.js';
 import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
+import { setupIndices } from './lib/searchIndexer.js';
+import { initWebSocket } from './lib/ws.js';
 
 const app = express();
 
@@ -106,8 +109,10 @@ app.use((err, req, res, _next) => {
   res.status(status).json({ success: false, status, entity, message: fullMsg });
 });
 
+const server = http.createServer(app);
+initWebSocket(server);
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
 });
 
@@ -115,6 +120,8 @@ app.listen(PORT, () => {
 try {
   // eslint-disable-next-line no-unused-vars
   import('./queue/cleanupScheduler.js').then(() => console.log('cleanup scheduler initialized')).catch((e) => console.error('failed to init cleanup scheduler', e));
+  // Initialize Elasticsearch indices in background if ES enabled
+  setupIndices().catch((e) => console.warn('search indices setup failed', e?.message || e));
 } catch (e) {
   // ignore; dynamic import failures should not stop the server
 }

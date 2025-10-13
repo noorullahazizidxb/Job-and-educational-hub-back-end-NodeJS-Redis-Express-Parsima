@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma.js';
 import { httpError, notFound, unauthorized } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { isSearchEnabled, getEsClient } from '../lib/elasticsearch.js';
+import { indexJobById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
 
 // List jobs by companyId
 export async function listByCompany(req, res, next) {
@@ -20,7 +22,8 @@ export async function list(req, res, next) {
     const { q, location, type, status, cityId, categoryId, featured, withReviews, withReviewsCount } = req.query;
     const where = {
       AND: [
-        q ? { OR: [ { title: { contains: q } }, { description: { contains: q } }, { skills: { contains: q } } ] } : {},
+        // q handled via Elasticsearch when enabled; DB fallback below if ES disabled
+        !q || !isSearchEnabled() ? (q ? { OR: [ { title: { contains: q } }, { description: { contains: q } }, { skills: { contains: q } } ] } : {}) : {},
         location ? { location: { contains: location } } : {},
         type ? { type } : {},
         status ? { status } : {},
@@ -44,6 +47,28 @@ export async function list(req, res, next) {
   const cached = await getJson(cacheKey);
   if (cached) return res.json(cached);
 
+  // If ES search enabled and q present, find IDs via ES first and filter DB by those IDs
+  let esOrderedIds = null;
+  if (q && isSearchEnabled()) {
+    try {
+      const client = await getEsClient();
+      const resp = await client.search({
+        index: 'jobs',
+        size: 100,
+        query: {
+          multi_match: { query: q, fields: ['title^3', 'description', 'skills^2', 'location'] }
+        }
+      });
+      const hits = resp?.hits?.hits || [];
+      esOrderedIds = hits.map(h => Number(h._source?.id)).filter(Boolean);
+      if (!esOrderedIds.length) {
+        await setJson(cacheKey, [], 10);
+        return res.json([]);
+      }
+      where.AND.push({ id: { in: esOrderedIds } });
+    } catch (e) { /* fallback silently */ }
+  }
+
   const items = await prisma.job.findMany({
       where,
       orderBy: { postedAt: 'desc' },
@@ -54,6 +79,12 @@ export async function list(req, res, next) {
   applications: { include: { user: true } },
       },
     });
+
+    // Preserve ES score ordering if applicable
+    if (esOrderedIds && esOrderedIds.length) {
+      const order = new Map(esOrderedIds.map((id, i) => [id, i]));
+      items.sort((a, b) => (order.get(a.id) ?? 999999) - (order.get(b.id) ?? 999999));
+    }
 
     // Always attach review aggregates (avgRating, reviewCount) for list view
     if (items.length) {
@@ -258,6 +289,7 @@ export async function create(req, res, next) {
   // Invalidate job lists and company lists
   await del('jobs:list:{}');
   await del('companies:list:{}');
+  try { await indexJobById(job.id); } catch {}
   res.status(201).json(job);
   } catch (err) { next(err); }
 }
@@ -297,6 +329,7 @@ export async function update(req, res, next) {
     });
   await del('jobs:list:{}');
   await del('companies:list:{}');
+  try { await indexJobById(job.id); } catch {}
   res.json(job);
   } catch (err) { next(err); }
 }
@@ -304,9 +337,12 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const { slug } = req.params;
+  // Fetch id first for ES deletion
+  const existing = await prisma.job.findUnique({ where: { slug }, select: { id: true } });
   await prisma.job.delete({ where: { slug } });
   await del('jobs:list:{}');
   await del('companies:list:{}');
+  try { if (existing) await deleteFromIndex(INDEX.jobs, existing.id); } catch {}
   res.status(204).end();
   } catch (err) { next(err); }
 }
