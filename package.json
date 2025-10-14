@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "worker": "node ./src/queue/imageProcessor.js",
     "cleanup": "node ./src/queue/dailyCleanup.js",
-    "check:services": "node -r dotenv/config ./scripts/check-connectivity.js"
+    "check:services": "node -r dotenv/config ./scripts/check-connectivity.js",
+    "reindex:es": "node -r dotenv/config ./scripts/reindex-all.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

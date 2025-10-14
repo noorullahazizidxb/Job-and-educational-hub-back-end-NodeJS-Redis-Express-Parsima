@@ -3,11 +3,10 @@ import Redis from 'ioredis';
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const redisPassword = process.env.REDIS_PASSWORD || undefined;
-const redisUsername = process.env.REDIS_USERNAME || 'noorullah';
 let redisClient;
-if (redisPassword || redisUsername) {
+if (redisPassword) {
   const url = new URL(redisUrl);
-  redisClient = new Redis({ host: url.hostname, port: Number(url.port) || 6379, username: redisUsername, password: redisPassword });
+  redisClient = new Redis({ host: url.hostname, port: Number(url.port) || 6379, password: redisPassword });
 } else {
   redisClient = new Redis(redisUrl);
 }

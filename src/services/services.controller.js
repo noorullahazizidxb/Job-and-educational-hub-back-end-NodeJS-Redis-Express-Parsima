@@ -47,15 +47,22 @@ export async function list(req, res, next) {
 
     const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
     const cached = await getJson(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });
+      return res.json(cached);
+    }
 
     let esOrderedIds = null;
+    let suggestions = [];
     if (q && isSearchEnabled()) {
       try {
         const client = await getEsClient();
         const resp = await client.search({ index: 'services', size: 100, query: { multi_match: { query: q, fields: ['title^3','description','tags','organization'] } } });
-        const ids = (resp?.hits?.hits || []).map(h => Number(h._source?.id)).filter(Boolean);
-        if (!ids.length) { await setJson(cacheKey, [], 10); return res.json([]); }
+        const hits = resp?.hits?.hits || [];
+        const ids = hits.map(h => Number(h._source?.id)).filter(Boolean);
+        // suggestions: unique titles or organizations from top hits
+        suggestions = [...new Set(hits.map(h => h._source?.title || h._source?.organization).filter(Boolean))].slice(0, 10);
+        if (!ids.length) { const payload = { items: [], suggestions }; await setJson(cacheKey, payload, 10); return res.json(payload); }
         esOrderedIds = ids;
         where.AND.push({ id: { in: ids } });
       } catch {}
@@ -74,8 +81,9 @@ export async function list(req, res, next) {
       const order = new Map(esOrderedIds.map((id, i) => [id, i]));
       items.sort((a, b) => (order.get(a.id) ?? 999999) - (order.get(b.id) ?? 999999));
     }
-    await setJson(cacheKey, items, 30);
-    res.json(items);
+    const payload = { items, suggestions };
+    await setJson(cacheKey, payload, 30);
+    res.json(payload);
   } catch (err) { next(err); }
 }
 

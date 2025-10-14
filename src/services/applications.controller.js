@@ -49,11 +49,28 @@ export async function listJobApplications(req, res, next) {
     };
     const cacheKey = `jobApplications:list:${JSON.stringify(req.query || {})}`;
     const cached = await getJson(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });
+      return res.json(cached);
+    }
+
+  let suggestions = [];
+  if (q && typeof q === 'string') {
+      try {
+        const { isSearchEnabled, getEsClient } = await import('../lib/elasticsearch.js');
+        if (isSearchEnabled()) {
+          const client = await getEsClient();
+          const resp = await client.search({ index: 'applications', size: 50, query: { multi_match: { query: q, fields: ['fullName^3','email'] } } });
+          const hits = resp?.hits?.hits || [];
+          suggestions = [...new Set(hits.map(h => h._source?.fullName || h._source?.email).filter(Boolean))].slice(0, 10);
+        }
+      } catch (e) { /* ignore */ }
+    }
 
     const items = await prisma.jobApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { job: true, user: true } });
-    await setJson(cacheKey, items, 30);
-    res.json(items);
+    const payload = { items, suggestions };
+    await setJson(cacheKey, payload, 30);
+    res.json(payload);
   } catch (err) { next(err); }
 }
 
@@ -104,10 +121,28 @@ export async function listServiceApplications(req, res, next) {
     };
     const cacheKey = `serviceApplications:list:${JSON.stringify(req.query || {})}`;
     const cached = await getJson(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });
+      return res.json(cached);
+    }
+
+  let suggestions = [];
+  if (q && typeof q === 'string') {
+      try {
+        const { isSearchEnabled, getEsClient } = await import('../lib/elasticsearch.js');
+        if (isSearchEnabled()) {
+          const client = await getEsClient();
+          const resp = await client.search({ index: 'applications', size: 50, query: { multi_match: { query: q, fields: ['fullName^3','email'] } } });
+          const hits = resp?.hits?.hits || [];
+          suggestions = [...new Set(hits.map(h => h._source?.fullName || h._source?.email).filter(Boolean))].slice(0, 10);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
     const items = await prisma.serviceApplication.findMany({ where, orderBy: { createdAt: 'desc' }, include: { service: true, user: true } });
-    await setJson(cacheKey, items, 30);
-    res.json(items);
+    const payload = { items, suggestions };
+    await setJson(cacheKey, payload, 30);
+    res.json(payload);
   } catch (err) { next(err); }
 }
 

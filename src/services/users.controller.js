@@ -18,7 +18,24 @@ export async function list(req, res, next) {
     };
   const cacheKey = `users:list:${JSON.stringify(req.query || {})}`;
   const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) {
+    if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });
+    return res.json(cached);
+  }
+
+  let suggestions = [];
+  // If ES is enabled and q provided we could derive suggestions from ES hits (names/emails)
+  if (q && typeof q === 'string') {
+    try {
+      const { isSearchEnabled, getEsClient } = await import('../lib/elasticsearch.js');
+      if (isSearchEnabled()) {
+        const client = await getEsClient();
+        const resp = await client.search({ index: 'users', size: 50, query: { multi_match: { query: q, fields: ['name^3','email'] } } });
+        const hits = resp?.hits?.hits || [];
+        suggestions = [...new Set(hits.map(h => h._source?.name || h._source?.email).filter(Boolean))].slice(0, 10);
+      }
+    } catch (e) { /* ignore ES suggestion errors */ }
+  }
 
   const items = await prisma.user.findMany({
     where,
@@ -76,8 +93,9 @@ export async function list(req, res, next) {
       }
     }
 
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+  const payload = { items, suggestions };
+  await setJson(cacheKey, payload, 30);
+  res.json(payload);
   } catch (err) { next(err); }
 }
 

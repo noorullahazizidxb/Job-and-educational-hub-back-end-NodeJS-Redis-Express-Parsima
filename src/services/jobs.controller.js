@@ -45,10 +45,15 @@ export async function list(req, res, next) {
 
   const cacheKey = `jobs:list:${JSON.stringify(req.query || {})}`;
   const cached = await getJson(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) {
+    // Backwards compatibility: older cached value may be an array of items.
+    if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });
+    return res.json(cached);
+  }
 
   // If ES search enabled and q present, find IDs via ES first and filter DB by those IDs
   let esOrderedIds = null;
+  let suggestions = [];
   if (q && isSearchEnabled()) {
     try {
       const client = await getEsClient();
@@ -61,9 +66,12 @@ export async function list(req, res, next) {
       });
       const hits = resp?.hits?.hits || [];
       esOrderedIds = hits.map(h => Number(h._source?.id)).filter(Boolean);
+      // suggestions: unique titles from top hits
+      suggestions = [...new Set(hits.map(h => h._source?.title).filter(Boolean))].slice(0, 10);
       if (!esOrderedIds.length) {
-        await setJson(cacheKey, [], 10);
-        return res.json([]);
+        const payload = { items: [], suggestions };
+        await setJson(cacheKey, payload, 10);
+        return res.json(payload);
       }
       where.AND.push({ id: { in: esOrderedIds } });
     } catch (e) { /* fallback silently */ }
@@ -125,8 +133,9 @@ export async function list(req, res, next) {
         for (const job of items) job.reviews = [];
       }
     }
-  await setJson(cacheKey, items, 30);
-  res.json(items);
+  const payload = { items, suggestions };
+  await setJson(cacheKey, payload, 30);
+  res.json(payload);
   } catch (err) { next(err); }
 }
 

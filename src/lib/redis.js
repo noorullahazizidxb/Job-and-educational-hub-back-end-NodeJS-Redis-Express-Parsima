@@ -3,17 +3,16 @@ import Redis from 'ioredis';
 // Support both REDIS_URL and explicit REDIS_PASSWORD. When a password is provided
 // prefer passing options to ioredis so credentials aren't duplicated in a URL.
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const redisPassword = process.env.REDIS_PASSWORD || undefined;
-const redisUsername = process.env.REDIS_USERNAME || 'noorullah';
+const redisPassword = process.env.REDIS_PASSWORD ;
 
 let redis;
-// If either username or password is provided, prefer options object.
-if (redisPassword || redisUsername) {
+// If a password is provided (common for AUTH), connect using options and only set password.
+// Avoid passing a username by default to prevent WRONGPASS errors when ACLs/users are not configured.
+if (redisPassword) {
   const url = new URL(redisUrl);
   redis = new Redis({
     host: url.hostname,
     port: Number(url.port) || 6379,
-    username: redisUsername,
     password: redisPassword,
     // keep default ready-check behaviour; adjust if using sentinel/cluster
   });

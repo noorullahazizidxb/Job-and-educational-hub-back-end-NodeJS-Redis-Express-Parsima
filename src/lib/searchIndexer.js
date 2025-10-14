@@ -3,11 +3,11 @@ import { getEsClient, isSearchEnabled, refreshIndices } from './elasticsearch.js
 import logger from '../utils/logger.js';
 
 export const INDEX = {
-  companies: 'companies',
-  jobs: 'jobs',
-  services: 'services',
-  users: 'users',
-  applications: 'applications', // both job + service applications with type field
+  companies: process.env.ES_INDEX_COMPANIES || 'companies',
+  jobs: process.env.ES_INDEX_JOBS || 'jobs',
+  services: process.env.ES_INDEX_SERVICES || 'services',
+  users: process.env.ES_INDEX_USERS || 'users',
+  applications: process.env.ES_INDEX_APPLICATIONS || 'applications', // both job + service applications with type field
 };
 
 async function ensureIndex(client, index, mappings) {
