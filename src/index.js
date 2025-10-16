@@ -27,7 +27,7 @@ import './lib/redis.js';
 import rateLimitMiddleware from './middleware/rateLimit.js';
 import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
 import { setupIndices } from './lib/searchIndexer.js';
-import { initWebSocket } from './lib/ws.js';
+import { initWebSocket, getIO } from './lib/ws.js';
 
 const app = express();
 
@@ -111,6 +111,19 @@ app.use((err, req, res, _next) => {
 
 const server = http.createServer(app);
 initWebSocket(server);
+// Optional: emit a gentle ping to clients visiting common pages to ensure they join inbox rooms
+function wsSubscribeHint(req, _res, next) {
+  try {
+    const io = getIO();
+    // We can't target a specific socket here; instead, expose a header that frontends can use
+    // or simply rely on client-side code to always call subscribe:inbox after socket connect.
+    // Set a hint header for frontend to trigger subscribe.
+    _res.setHeader('X-WS-Subscribe-Inbox', '1');
+  } catch {}
+  return next();
+}
+// Attach the hint middleware to common hero paths
+app.use(['/api/jobs', '/api/services', '/api/companies', '/api/stats/overview'], wsSubscribeHint);
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);

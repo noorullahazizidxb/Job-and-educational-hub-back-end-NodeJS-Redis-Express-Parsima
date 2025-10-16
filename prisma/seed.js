@@ -103,9 +103,9 @@ async function main() {
           dark: {
             primary: '#60a5fa',
             accent: '#a78bfa',
-            secondary: '#a50000ff',
-            background: '#0b1220',
-            surface: '#111827',
+            secondary: '#750E21',
+            background: '#0F0F0F',
+            surface: '#1A1A1D',
             muted: '#374151',
             text: '#e5e7eb',
             border: '#1f2937',

@@ -6,6 +6,7 @@ import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
 import { enqueueProfileOptimization } from '../middleware/upload.js';
 import { indexUserById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
+import { notifyUser } from '../lib/notify.js';
 
 export async function list(req, res, next) {
   try {
@@ -175,6 +176,8 @@ export async function create(req, res, next) {
   }
   await del('users:list:{}');
   try { await indexUserById(item.id); } catch {}
+  // Welcome notification for newly created user (common role)
+  try { await notifyUser({ title: 'Welcome to Job Portal', body: 'Your account has been created successfully.', userId: item.id, createdById: req.user?.id || null }); } catch {}
   res.status(201).json(item);
   } catch (err) { next(err); }
 }

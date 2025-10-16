@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { reindexAfterCleanup } from '../lib/searchIndexer.js';
+import { notifyCompany, notifyUser } from '../lib/notify.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -37,11 +38,12 @@ export async function runCleanup(dryRun = false) {
   const cutoff = daysAgoDate(DAYS);
 
   // Delete JobApplications for jobs that closed before cutoff
-  const jobIdsToDelete = (await prisma.job.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true } })).map((j) => j.id);
+  const jobsToArchive = await prisma.job.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true, title: true, companyId: true } });
+  const jobIdsToDelete = jobsToArchive.map((j) => j.id);
   let deletedJobAppIds = [];
   if (jobIdsToDelete.length) {
     // collect and remove CV and cover letter files referenced by job applications
-  const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true } });
+  const jobApps = await prisma.jobApplication.findMany({ where: { jobId: { in: jobIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true, userId: true, job: { select: { title: true } } } });
   deletedJobAppIds = jobApps.map(a => a.id);
     const jobAppCvFiles = jobApps.map((a) => a.cvUrl).filter(Boolean);
     const jobAppCoverFiles = jobApps.map((a) => a.coverLetter).filter(Boolean);
@@ -94,11 +96,12 @@ export async function runCleanup(dryRun = false) {
   }
 
   // Delete Services' applications for services closed before cutoff
-  const serviceIdsToDelete = (await prisma.service.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true } })).map((s) => s.id);
+  const servicesToArchive = await prisma.service.findMany({ where: { closingDate: { lt: cutoff } }, select: { id: true, title: true, companyId: true } });
+  const serviceIdsToDelete = servicesToArchive.map((s) => s.id);
   let deletedServiceAppIds = [];
   if (serviceIdsToDelete.length) {
     // collect and remove CV files referenced by service applications
-  const svcApps = await prisma.serviceApplication.findMany({ where: { serviceId: { in: serviceIdsToDelete } }, select: { id: true, cvUrl: true } });
+  const svcApps = await prisma.serviceApplication.findMany({ where: { serviceId: { in: serviceIdsToDelete } }, select: { id: true, cvUrl: true, coverLetter: true, userId: true, service: { select: { title: true } } } });
   deletedServiceAppIds = svcApps.map(a => a.id);
     const svcAppFiles = svcApps.map((a) => a.cvUrl).filter(Boolean);
     let deletedSvcFilesCount = 0;
@@ -212,6 +215,34 @@ export async function runCleanup(dryRun = false) {
     });
   } catch (e) {
     console.error('search reindexAfterCleanup failed', e?.message || e);
+  }
+
+  // Notify impacted companies and users about deletions (best-effort; non-blocking)
+  try {
+    if (!dryRun) {
+      if (jobIdsToDelete.length) {
+        for (const j of jobsToArchive) {
+          if (j.companyId) try { await notifyCompany({ title: 'Job archived', body: `${j.title} has been archived after expiration.`, companyId: j.companyId }); } catch {}
+        }
+      }
+      if (serviceIdsToDelete.length) {
+        for (const s of servicesToArchive) {
+          if (s.companyId) try { await notifyCompany({ title: 'Service archived', body: `${s.title} has been archived after expiration.`, companyId: s.companyId }); } catch {}
+        }
+      }
+      if (deletedJobAppIds.length) {
+        for (const a of jobApps) {
+          try { await notifyUser({ title: 'Application archived', body: `Your application for ${a.job?.title || 'a job'} has been archived after expiration.`, userId: a.userId }); } catch {}
+        }
+      }
+      if (deletedServiceAppIds.length) {
+        for (const a of svcApps) {
+          try { await notifyUser({ title: 'Application archived', body: `Your application for ${a.service?.title || 'a service'} has been archived after expiration.`, userId: a.userId }); } catch {}
+        }
+      }
+    }
+  } catch (e) {
+    console.error('cleanup notification emission failed', e?.message || e);
   }
 
   return result;

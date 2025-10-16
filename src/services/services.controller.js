@@ -22,6 +22,7 @@ import { prisma } from '../lib/prisma.js';
 import { notFound } from '../utils/httpError.js';
 import { indexServiceById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
 import { isSearchEnabled, getEsClient } from '../lib/elasticsearch.js';
+import { notifyCompany } from '../lib/notify.js';
 
 export async function list(req, res, next) {
   try {
@@ -147,6 +148,7 @@ export async function create(req, res, next) {
     await del('services:list:{}');
     await del('services:featured:{}');
     try { await indexServiceById(item.id); } catch {}
+    try { if (item.companyId) await notifyCompany({ title: 'New service posted', body: item.title, companyId: item.companyId, createdById: req.user?.id }); } catch {}
     res.status(201).json(item);
   } catch (err) { next(err); }
 }

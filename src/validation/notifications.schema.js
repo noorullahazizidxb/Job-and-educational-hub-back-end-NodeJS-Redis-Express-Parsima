@@ -22,6 +22,7 @@ export const createNotificationSchema = Joi.object({
   recipientUserIds: Joi.array().items(Joi.number().integer()).default([]),
   recipientCompanyIds: Joi.array().items(Joi.number().integer()).default([]),
 })
+.rename('userIds', 'recipientUserIds', { ignoreUndefined: true, override: true })
 .custom((val, helpers) => {
   const hasTargetAll = !!val.targetAll;
   const hasTargetRole = !!val.targetRole;

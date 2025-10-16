@@ -3,6 +3,7 @@ import { httpError, notFound, unauthorized } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
 import { isSearchEnabled, getEsClient } from '../lib/elasticsearch.js';
 import { indexJobById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
+import { notifyCompany } from '../lib/notify.js';
 
 // List jobs by companyId
 export async function listByCompany(req, res, next) {
@@ -299,6 +300,10 @@ export async function create(req, res, next) {
   await del('jobs:list:{}');
   await del('companies:list:{}');
   try { await indexJobById(job.id); } catch {}
+  // Notify company owners about new job post
+  try {
+    await notifyCompany({ title: 'New job posted', body: job.title, companyId: job.companyId, createdById: req.user?.id });
+  } catch {}
   res.status(201).json(job);
   } catch (err) { next(err); }
 }
