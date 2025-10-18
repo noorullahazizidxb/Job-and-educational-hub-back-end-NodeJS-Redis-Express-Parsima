@@ -834,6 +834,34 @@ Content-Type: application/json
   "comment": "Updated by admin"
 }
 
+##############################
+# Contacts
+##############################
+
+### Create Contact (public)
+POST {{base}}/api/contacts
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "phoneNumber": "+1234567890",
+  "message": "Hello, I’d like to know more about your services."
+}
+
+### List contacts (admin)
+GET {{base}}/api/contacts
+Authorization: Bearer {{adminToken}}
+
+### Contact detail (admin)
+GET {{base}}/api/contacts/1
+Authorization: Bearer {{adminToken}}
+
+### Delete contact (admin)
+DELETE {{base}}/api/contacts/1
+Authorization: Bearer {{adminToken}}
+
 ### Reviews: Admin delete a review (replace id 1 accordingly)
 DELETE {{base}}/api/reviews/1
 Authorization: Bearer {{adminToken}}

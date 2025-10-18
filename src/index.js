@@ -23,6 +23,7 @@ import notificationsRouter from './routes/notifications.js';
 import reviewsRouter from './routes/reviews.js';
 import statsRouter from './routes/stats.js';
 import reportsRouter from './routes/reports.js';
+import contactsRouter from './routes/contacts.js';
 import './lib/redis.js';
 import rateLimitMiddleware from './middleware/rateLimit.js';
 import { responseEnvelope, getEntityFromRequest } from './middleware/response.js';
@@ -92,6 +93,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/reviews', reviewsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/contacts', contactsRouter);
 
 app.use((err, req, res, _next) => {
   console.error(err);

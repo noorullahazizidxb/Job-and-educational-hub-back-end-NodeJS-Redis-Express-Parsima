@@ -137,14 +137,22 @@ async function main() {
   }
 
   // Companies + company users (ensure at least 10 companies)
+  // Reusable logo URLs provided by the user
+  const logoUrls = [
+    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcToIq3KIVyxaLMZ1w4Y-FrZDpw4TU5Kvv1i3g&s',
+    'https://www.allrecipes.com/thmb/wyo41T1opm7uI0jUj6iVkwsicYQ=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/AR-Coke-4x3-4-68e225a056314b0a8a0b549f433f0b81.jpg',
+    'https://images.seeklogo.com/logo-png/49/1/ariana-afghan-airlines-logo-png_seeklogo-497725.png',
+    // shortened: replaced inlined base64 logos with remote image URLs to avoid DB column overflow
+    'https://upload.wikimedia.org/wikipedia/commons/4/44/Logo_2013_Google.png'
+  ];
   const company = await prisma.company.upsert({
     where: { slug: 'acme-corp' },
-    update: { name: 'Acme Corp', logoUrl: 'https://www.acbar.org/Website/images/logo.png' },
+    update: { name: 'Acme Corp', logoUrl: logoUrls[0] },
     create: {
       name: 'Acme Corp',
       slug: 'acme-corp',
       website: 'https://acme.example.com',
-      logoUrl: 'https://www.acbar.org/Website/images/logo.png',
+      logoUrl: logoUrls[0],
       industry: 'Technology',
       size: '51-200',
       about: 'We build awesome stuff.',
@@ -162,12 +170,12 @@ async function main() {
     const slug = toSlug(name);
     const c = await prisma.company.upsert({
       where: { slug },
-      update: { name, logoUrl: 'https://www.acbar.org/Website/images/logo.png' },
+      update: { name, logoUrl: logoUrls[companies.length % logoUrls.length] },
       create: {
         name,
         slug,
         website: `https://${slug}.example.com`,
-        logoUrl: 'https://www.acbar.org/Website/images/logo.png',
+        logoUrl: logoUrls[companies.length % logoUrls.length],
         industry: 'Technology',
         size: '11-50',
         about: `${name} about`,
@@ -519,13 +527,24 @@ async function main() {
   }
 
   // Seed at least 10 advertisements
+  // Reusable advertisement image URLs to populate ad records
+  const adImageUrls = [
+    'https://images.unsplash.com/photo-1508830524289-0adcbe822b40?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1506765515384-028b60a970df?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1448932223592-d1fc686e76ea?auto=format&fit=crop&w=1200&q=80'
+  ];
   await prisma.advertisement.upsert({
     where: { id: 1 },
     update: { title: 'Homepage Hero Banner' },
     create: {
       title: 'Homepage Hero Banner',
       placement: 'home_page_after_pagenation_1',
-      imageUrl: 'https://picsum.photos/1200/400',
+      imageUrl: adImageUrls[0],
       targetUrl: 'https://example.com',
       isActive: true,
       priority: 10,
@@ -538,7 +557,7 @@ async function main() {
       create: {
         title: `Ad ${i}`,
         placement: i % 2 === 0 ? 'home_page_after_pagenation_2' : 'job_list_top',
-        imageUrl: `https://picsum.photos/seed/${i}/600/200`,
+        imageUrl: adImageUrls[i % adImageUrls.length],
         targetUrl: 'https://example.com',
         isActive: i % 3 !== 0,
         priority: i,
@@ -630,10 +649,26 @@ async function main() {
     const i = allCompanies.length + 1;
     const name = `Seed Company ${i}`;
     const slug = toSlug(`${name}-${i}-${Date.now().toString().slice(-4)}`);
-    const c = await prisma.company.create({ data: { name, slug, website: `https://${slug}.example.com`, industry: 'Services', size: '11-50', about: `${name} about`, description: `${name} description`, address: 'Seed Address' } });
+    // pick a logoUrl from the provided list (use current length as index seed)
+    const logoForNew = logoUrls[allCompanies.length % logoUrls.length];
+    const c = await prisma.company.create({ data: { name, slug, website: `https://${slug}.example.com`, logoUrl: logoForNew, industry: 'Services', size: '11-50', about: `${name} about`, description: `${name} description`, address: 'Seed Address' } });
     allCompanies.push(c);
     createdCompanies++;
     if (createdCompanies > TARGET * 2) break;
+  }
+
+  // Ensure any existing companies that were created without a logoUrl get assigned one from logoUrls
+  allCompanies = await prisma.company.findMany({ orderBy: { id: 'asc' } });
+  for (let idx = 0; idx < allCompanies.length; idx++) {
+    const comp = allCompanies[idx];
+    if (!comp.logoUrl) {
+      const newLogo = logoUrls[idx % logoUrls.length];
+      try {
+        await prisma.company.update({ where: { id: comp.id }, data: { logoUrl: newLogo } });
+      } catch (err) {
+        // ignore per-company failures to avoid blocking seeding
+      }
+    }
   }
 
   // Create users (mix of common and company) until TARGET

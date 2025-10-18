@@ -258,6 +258,21 @@ CREATE TABLE `JobReview` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `Contact` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `firstName` VARCHAR(191) NOT NULL,
+    `lastName` VARCHAR(191) NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `phoneNumber` VARCHAR(191) NULL,
+    `message` LONGTEXT NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `Contact_email_idx`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `Company` ADD CONSTRAINT `Company_cityId_fkey` FOREIGN KEY (`cityId`) REFERENCES `City`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 

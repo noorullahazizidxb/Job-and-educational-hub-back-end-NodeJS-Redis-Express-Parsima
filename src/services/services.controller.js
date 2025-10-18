@@ -26,13 +26,14 @@ import { notifyCompany } from '../lib/notify.js';
 
 export async function list(req, res, next) {
   try {
-    const { q, type, status, cityId } = req.query;
+    const { q, type, status, cityId, featured } = req.query;
     const where = {
       AND: [
         !q || !isSearchEnabled() ? (q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }, { tags: { contains: q } }] } : {}) : {},
         type ? { type } : {},
         status ? { status } : {},
         cityId ? { cityId: Number(cityId) } : {},
+        typeof featured !== 'undefined' ? { featured: featured === true || featured === 'true' } : {},
       ],
     };
 
@@ -46,7 +47,7 @@ export async function list(req, res, next) {
       }
     } catch (e) { }
 
-    const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
+  const cacheKey = `services:list:${JSON.stringify(req.query || {})}`;
     const cached = await getJson(cacheKey);
     if (cached) {
       if (Array.isArray(cached)) return res.json({ items: cached, suggestions: [] });

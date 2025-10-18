@@ -362,3 +362,17 @@ model JobReview {
   updatedAt DateTime @updatedAt
   @@index([jobId])
 }
+
+// Contact submissions from site visitors
+model Contact {
+  id          Int      @id @default(autoincrement())
+  firstName   String
+  lastName    String?
+  email       String
+  phoneNumber String?
+  message     String   @db.LongText
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+}

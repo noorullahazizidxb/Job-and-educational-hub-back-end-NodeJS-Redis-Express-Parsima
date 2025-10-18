@@ -7,6 +7,7 @@ export const listServicesSchema = Joi.object({
   q: Joi.string().allow('').optional(),
   type: type.optional(),
   status: status.optional(),
+  featured: Joi.boolean().optional(),
   cityId: Joi.number().integer().optional(),
   page: Joi.forbidden(),
   pageSize: Joi.forbidden(),
