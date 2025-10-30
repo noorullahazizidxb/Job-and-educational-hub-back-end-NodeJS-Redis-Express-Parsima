@@ -34,7 +34,7 @@ Notes: health endpoint at `/health` performs a lightweight DB check (SELECT 1).
 - Error handling: `src/index.js` has an Express error handler that normalizes Joi validation errors (err.isJoi). Return shapes follow the `responseEnvelope()` middleware — add `{ success, status, entity, message }` when appropriate.
 - Validation: Joi schemas are in `validation/*.schema.js` and used by route/middleware; follow existing schema style and messages.
 - Shared singletons: See `src/lib/prisma.js`, `src/lib/redis.js`, and ES/queue connection factories. Prefer importing and reusing the exported instances rather than creating new clients.
-- Search index mappings: Update `src/lib/searchIndexer.js` for any changes in indexed fields or mapping rules; the file contains explicit `mapX` functions used for indexing. For applications index, note the composite _id pattern `type:id` to avoid collisions.
+- Search index mappings: Update `src/lib/searchIndexer.js` for any changes in indexed fields or mapping rules; the file contains explicit `mapX` functions used for indexing. For applications index, note the composite \_id pattern `type:id` to avoid collisions.
 - Background jobs: scheduled/worker logic is under `queue/` and `src/lib/queue.js`. The main process dynamically imports `queue/cleanupScheduler.js` at startup — avoid duplicating scheduler instances.
 - WebSocket rooms: per-user rooms use `user:ID` and company rooms use `company:ID` (see `src/lib/ws.js`). Use `getIO()` to emit events from controllers/services.
 
@@ -58,7 +58,7 @@ Notes: health endpoint at `/health` performs a lightweight DB check (SELECT 1).
 - Validation: `validation/*.schema.js`
 - Middleware: `src/middleware/*` (authn, authz, rateLimit, response)
 
-## Examples of "		,": small code hints and common fixes
+## Examples of " ,": small code hints and common fixes
 
 - Use existing helpers: to emit a user notification from a controller, import `getIO()` or `notifyUserInbox` from `src/lib/ws.js` instead of direct Socket.IO references.
 - When indexing after writes: call `indexJobById(id)` / `indexServiceById(id)` etc. from `src/lib/searchIndexer.js` rather than building ad-hoc bulk operations.
