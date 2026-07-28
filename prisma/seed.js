@@ -79,63 +79,6 @@ async function main() {
   create: { email: adminEmail, passwordHash: adminHash, role: 'admin', name: 'Site Admin', about: 'Administrator account', skills: null, phone: null, address: null },
   });
 
-  // Default theme setting (only create if missing to avoid overwriting user changes)
-  const existingTheme = await prisma.setting.findUnique({ where: { key: 'theme' } });
-  if (!existingTheme) {
-  await prisma.setting.create({
-      data: {
-        key: 'theme',
-        value: null,
-        json: {
-          light: {
-            primary: '#3b82f6',
-            accent: '#8b5cf6',
-            secondary: '#a50000ff',
-            background: '#ffffff',
-            surface: '#f8fafc',
-            muted: '#e5e7eb',
-            text: '#0f172a',
-            border: '#e2e8f0',
-            success: '#22c55e',
-            warning: '#f59e0b',
-            danger: '#ef4444',
-          },
-          dark: {
-            primary: '#60a5fa',
-            accent: '#a78bfa',
-            secondary: '#750E21',
-            background: '#0F0F0F',
-            surface: '#1A1A1D',
-            muted: '#374151',
-            text: '#e5e7eb',
-            border: '#1f2937',
-            success: '#4ade80',
-            warning: '#fbbf24',
-            danger: '#f87171',
-          },
-          tokens: {
-            radius: { button: 6, input: 6, card: 10 },
-            spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
-            shadow: {
-              sm: '0 1px 2px rgba(0,0,0,0.05)',
-              md: '0 4px 6px rgba(0,0,0,0.1)',
-              lg: '0 10px 15px rgba(0,0,0,0.15)',
-            },
-            typography: {
-              fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-              baseSize: 16,
-              lineHeight: 1.5,
-              weightRegular: 400,
-              weightMedium: 500,
-              weightBold: 700,
-            },
-            transition: { duration: 200, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-          },
-        },
-      },
-    });
-  }
-
   // Companies + company users (ensure at least 10 companies)
   // Reusable logo URLs provided by the user
   const logoUrls = [

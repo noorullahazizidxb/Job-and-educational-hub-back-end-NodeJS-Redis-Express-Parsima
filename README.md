@@ -89,7 +89,7 @@ API runs at http://localhost:4000
 - `type` is an enum (`full_time`, `part_time`, `contract`, `internship`, `temporary`, `remote`).
 - Ads: use `placement` values `job_list_top|middle_of_job_list|home_page_after_pagenation_1|home_page_after_pagenation_2|middle_of_related_jobs_on_job_details|company_list_top|middle_of_company_list|middle_of_related_companies_on_company_details|service_list_top|middle_of_service_list|middle_of_related_services_on_service_details`. `activeOnly=true` returns only currently active ads by `startAt/endAt` window.
 - Roles: `common` (default), `company`, `admin`, `employee`. Company users can post jobs/services; common users can apply; admins/employees can manage site content and settings.
-- Settings: Use key/value or JSON for theme, colors, and other site configurations.
+- Settings: Use key/value or JSON for site configurations. Theme is no longer stored here (frontend ui-context).
 
 ## Prisma and Scaling (recommendations)
 
