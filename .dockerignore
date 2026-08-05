@@ -8,6 +8,9 @@ node_modules
 uploads
 coverage
 *.md
+scripts/
+docker-compose*.yml
+*.http
 docker-configuration
 .DS_Store
 .specstory

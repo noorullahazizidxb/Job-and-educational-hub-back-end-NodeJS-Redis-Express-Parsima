@@ -1,0 +1,193 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  DevMinds Job-Portal — full-stack Docker Compose
+#
+#  Quick start (local dev):
+#    1. cp .env.compose.example .env.compose
+#    2. Edit .env.compose — set FRONTEND_PATH to the absolute path of jobs-app
+#    3. docker compose --env-file .env.compose up --build
+#
+#  Production:
+#    Override MYSQL_ROOT_PASSWORD, REDIS_PASSWORD, ES_PASSWORD, JWT_SECRET
+#    and NEXT_PUBLIC_API_BASE with real values before deploying.
+#
+#  Services:
+#    mysql          → host port 3306   (database)
+#    redis          → host port 16379  (cache / queues)
+#    elasticsearch  → host port 9200   (search)
+#    kibana         → host port 5601   (optional ES UI — profile: tools)
+#    backend        → host port 4001   (Express API)
+#    frontend       → host port 3000   (Next.js app)
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ─── MySQL 8 ───────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Mcitp@123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-job_service_db}
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-Mcitp@123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - app_net
+
+  # ─── Redis 7 ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-sys}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-sys}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_net
+
+  # ─── Elasticsearch 8 ───────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=${ES_PASSWORD:-Mcitp@123}
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ES_PASSWORD:-Mcitp@123} http://localhost:9200/_cluster/health | grep -qv '\"status\":\"red\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - app_net
+
+  # ─── Kibana (optional — start with: docker compose --profile tools up) ─────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ES_PASSWORD:-Mcitp@123}
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - app_net
+
+  # ─── Backend (Express API) ──────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4001
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-Mcitp@123}@mysql:3306/${MYSQL_DATABASE:-job_service_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sys}@redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-sys}
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: ${ES_PASSWORD:-Mcitp@123}
+      ES_COMPATIBILITY: "8"
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      QUEUE_PREFIX: ${QUEUE_PREFIX:-job-portal}
+      PROFILE_UPLOAD_LIMIT_BYTES: ${PROFILE_UPLOAD_LIMIT_BYTES:-5242880}
+      FILE_UPLOAD_LIMIT_BYTES: ${FILE_UPLOAD_LIMIT_BYTES:-5242880}
+      SERVICE_UPLOAD_LIMIT_BYTES: ${SERVICE_UPLOAD_LIMIT_BYTES:-10485760}
+      SOCKET_IO_ENABLED: "true"
+      SOCKET_IO_CORS_ORIGIN: "*"
+      CLEANUP_DRY_RUN: "false"
+      CLEANUP_AFTER_DAYS: "1"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4001:4001"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app_net
+
+  # ─── Frontend (Next.js) ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ${FRONTEND_PATH:-../jobs-app}
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_API_BASE is baked at build time — browser & SSR use this.
+        # For local Docker: http://localhost:4001 lets the browser reach backend
+        # via the exposed host port.
+        # For production: set this to your public API URL (e.g. https://api.example.com)
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:4001}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      # API_INTERNAL_URL lets server-side (SSR) fetches bypass localhost and hit
+      # the backend container directly over the Docker network.
+      API_INTERNAL_URL: http://backend:4001
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app_net
+
+# ──────────────────────────────────────────────────────────────────────────────
+volumes:
+  mysql_data:
+  redis_data:
+  es_data:
+  uploads_data:
+
+networks:
+  app_net:
+    driver: bridge
