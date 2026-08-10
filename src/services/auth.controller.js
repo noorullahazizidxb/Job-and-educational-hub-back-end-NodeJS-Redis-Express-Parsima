@@ -4,22 +4,28 @@ import { signToken } from '../utils/jwt.js';
 import { httpError } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
 import { incrementMetricAllPeriods } from '../lib/metrics.js';
+import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 
 export async function login(req, res, next) {
   try {
+    await verifyRecaptchaToken(req.body?.recaptchaToken, {
+      expectedAction: 'login',
+      remoteip: req.ip,
+    });
+
     const { email, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return next(httpError(401, 'Invalid credentials'));
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return next(httpError(401, 'Invalid credentials'));
     const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return next(httpError(401, 'Invalid credentials'));
+    if (!ok) return next(httpError(401, 'Invalid credentials'));
     const token = signToken({ sub: user.id, role: user.role, companyId: user.companyId || null });
-      // exclude passwordHash from the returned user
-      const { passwordHash, ...safeUser } = user;
-      // ensure any cached `me` is refreshed after login
-      try { await del(`auth:me:${user.id}`); } catch (e) { /* ignore cache errors */ }
-      // count successful login
-      try { await incrementMetricAllPeriods('metrics:auth:logins'); } catch (e) { /* ignore metrics errors */ }
-      res.json({ token, user: safeUser });
+    // exclude passwordHash from the returned user
+    const { passwordHash, ...safeUser } = user;
+    // ensure any cached `me` is refreshed after login
+    try { await del(`auth:me:${user.id}`); } catch (e) { /* ignore cache errors */ }
+    // count successful login
+    try { await incrementMetricAllPeriods('metrics:auth:logins'); } catch (e) { /* ignore metrics errors */ }
+    res.json({ token, user: safeUser });
   } catch (err) { next(err); }
 }
 

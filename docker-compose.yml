@@ -135,6 +135,8 @@ services:
       CLEANUP_DRY_RUN: "false"
       CLEANUP_AFTER_DAYS: "1"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      RECAPTCHA_MIN_SCORE: ${RECAPTCHA_MIN_SCORE:-0.5}
     ports:
       - "4001:4001"
     volumes:
@@ -166,6 +168,7 @@ services:
         # via the exposed host port.
         # For production: set this to your public API URL (e.g. https://api.example.com)
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:4001}
+        NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY:-}
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}

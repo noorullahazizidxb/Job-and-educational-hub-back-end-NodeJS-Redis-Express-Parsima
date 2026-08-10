@@ -6,7 +6,11 @@ import { loginRateLimitMiddleware } from '../middleware/rateLimit.js';
 
 const router = Router();
 
-const loginSchema = Joi.object({ email: Joi.string().email().required(), password: Joi.string().min(6).required() });
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  recaptchaToken: Joi.string().allow('', null).optional(),
+});
 
 router.post('/login', loginRateLimitMiddleware, validate(loginSchema), AuthController.login);
 router.get('/me', AuthController.me);
