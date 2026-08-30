@@ -1,0 +1,71 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "migrate-sqlite",
+			"type": "shell",
+			"command": "DB_PROVIDER=sqlite npx prisma migrate dev --name init_sqlite --schema prisma/schema.sqlite.prisma && DB_PROVIDER=sqlite node prisma/seed.js",
+			"isBackground": false
+		},
+		{
+			"label": "npm-install-backend",
+			"type": "shell",
+			"command": "npm install 2>&1 | tail -5",
+			"isBackground": false
+		},
+		{
+			"label": "check-prisma-version",
+			"type": "shell",
+			"command": "npx prisma --version 2>&1 | head -3",
+			"isBackground": false
+		},
+		{
+			"label": "migrate-sqlite-v2",
+			"type": "shell",
+			"command": "DB_PROVIDER=sqlite SQLITE_URL=\"file:./dev.db\" npx prisma migrate dev --name init_sqlite --schema prisma/schema.sqlite.prisma 2>&1",
+			"isBackground": false
+		},
+		{
+			"label": "seed-sqlite",
+			"type": "shell",
+			"command": "DB_PROVIDER=sqlite SQLITE_URL=\"file:./dev.db\" node prisma/seed.js 2>&1 | tail -20",
+			"isBackground": false
+		},
+		{
+			"label": "backend-start",
+			"type": "shell",
+			"command": "node src/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "restart-backend",
+			"type": "shell",
+			"command": "npx kill-port 4001 2>/dev/null; sleep 1; node src/index.js &",
+			"isBackground": true
+		},
+		{
+			"label": "force-restart-backend",
+			"type": "shell",
+			"command": "taskkill //F //IM node.exe 2>&1 | head -3; sleep 2; node src/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "test-backend-start",
+			"type": "shell",
+			"command": "node src/index.js 2>&1 | head -10",
+			"isBackground": false
+		},
+		{
+			"label": "kill-restart-backend",
+			"type": "shell",
+			"command": "netstat -ano | grep ':4001' | awk '{print $5}' | xargs -I {} taskkill //PID {} //F 2>&1; sleep 2 && node src/index.js &",
+			"isBackground": true
+		},
+		{
+			"label": "curl-jobs",
+			"type": "shell",
+			"command": "curl -s 'http://localhost:4001/api/jobs' | head -c 300",
+			"isBackground": false
+		}
+	]
+}

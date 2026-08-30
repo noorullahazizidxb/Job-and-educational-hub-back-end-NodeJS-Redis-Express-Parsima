@@ -1,0 +1,284 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite schema — used when DB_PROVIDER=sqlite.
+// Connection URL is configured in prisma.config.ts (Prisma v7); env fallback for v6.
+datasource db {
+  provider = "sqlite"
+  url      = env("SQLITE_URL")
+}
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  website   String?
+  logoUrl   String?
+  industry  String?
+  size      String?
+  about     String?
+  description String
+  address   String?
+  cityId    Int?
+  city      City?     @relation(fields: [cityId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      Job[]
+  users     User[]
+  services  Service[]
+  notificationRecipients NotificationRecipient[]
+
+  @@index([name])
+  @@index([cityId])
+}
+
+model Job {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  title       String
+  type        String   // JobType enum stored as string for SQLite
+  location    String
+  salaryMin   Int?
+  salaryMax   Int?
+  currency    String?  @default("USD")
+  description String
+  skills      String
+  benefits    String?
+  applyUrl    String?
+  applyEmail  String?
+  contactEmail String?
+  postedAt    DateTime @default(now())
+  closingDate DateTime?
+  vacancies   Int?     @default(1)
+  experience  String?  // ExperienceLevel
+  education   String?  // EducationLevel
+  gender      String?  // Gender
+  orgType     String?  // OrganizationType
+  status      String   @default("published") // JobStatus
+  featured    Boolean  @default(false)
+  featuredUntil DateTime?
+  views       Int      @default(0)
+  cityId      Int?
+  city        City?    @relation(fields: [cityId], references: [id])
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  categories  JobCategory[]
+  applications JobApplication[]
+  reviews     JobReview[]
+
+  @@index([title, location, type])
+  @@index([status, closingDate])
+  @@index([companyId])
+  @@index([cityId])
+  @@index([postedAt])
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      JobCategory[]
+}
+
+model JobCategory {
+  jobId     Int
+  categoryId Int
+  job       Job      @relation(fields: [jobId], references: [id])
+  category  Category @relation(fields: [categoryId], references: [id])
+
+  @@id([jobId, categoryId])
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String
+  province  String?
+  country   String?  @default("Afghanistan")
+  companies Company[]
+  jobs      Job[]
+  services  Service[]
+}
+
+model Advertisement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  placement String   // AdPlacement stored as string for SQLite
+  imageUrl  String
+  targetUrl String
+  isActive  Boolean  @default(true)
+  startAt   DateTime?
+  endAt     DateTime?
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([placement, isActive, startAt, endAt])
+}
+
+model Service {
+  id           Int      @id @default(autoincrement())
+  type         String   // ServiceType
+  title        String
+  slug         String   @unique
+  description  String
+  organization String?
+  companyId    Int?
+  company      Company? @relation(fields: [companyId], references: [id])
+  cityId       Int?
+  city         City?    @relation(fields: [cityId], references: [id])
+  country      String?  @default("Afghanistan")
+  category     String?
+  tags         String?
+  eligibility  String?
+  documents    String?  // JSON stored as TEXT in SQLite
+  applyUrl     String?
+  contactEmail String?
+  postedAt     DateTime @default(now())
+  closingDate  DateTime?
+  status       String   @default("published") // ServiceStatus
+  featured     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  applications ServiceApplication[]
+
+  @@index([type, status, closingDate])
+  @@index([companyId])
+  @@index([cityId])
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  email              String   @unique
+  passwordHash       String
+  name               String?
+  role               String   @default("common") // UserRole
+  companyId          Int?
+  company            Company? @relation(fields: [companyId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  jobApplications    JobApplication[]
+  serviceApplications ServiceApplication[]
+  jobReviews         JobReview[]
+  createdNotifications Notification[] @relation("NotificationCreatedBy")
+  notificationRecipients NotificationRecipient[]
+  photo              String?
+  about              String?
+  skills             String?
+  phone              String?
+  address            String?
+
+  @@index([companyId])
+}
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  title        String
+  body         String?
+  link         String?
+  createdById  Int?
+  createdBy    User?    @relation("NotificationCreatedBy", fields: [createdById], references: [id])
+  targetAll    Boolean  @default(false)
+  targetRole   String?  // UserRole
+  sendAt       DateTime?
+  createdAt    DateTime @default(now())
+  recipients   NotificationRecipient[]
+
+  @@index([createdById])
+}
+
+model NotificationRecipient {
+  id             Int          @id @default(autoincrement())
+  notificationId Int
+  notification   Notification @relation(fields: [notificationId], references: [id])
+  userId         Int?
+  user           User?        @relation(fields: [userId], references: [id])
+  companyId      Int?
+  company        Company?     @relation(fields: [companyId], references: [id])
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([notificationId])
+  @@index([userId])
+  @@index([companyId])
+  @@unique([notificationId, userId])
+  @@unique([notificationId, companyId])
+}
+
+model JobApplication {
+  id          Int      @id @default(autoincrement())
+  jobId       Int
+  job         Job      @relation(fields: [jobId], references: [id])
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  fullName    String
+  email       String
+  cvUrl       String?
+  coverLetter String?
+  answers     String?  // JSON stored as TEXT in SQLite
+  status      String   @default("applied") // ApplicationStatus
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([jobId, userId])
+  @@index([jobId, status])
+  @@index([userId])
+}
+
+model ServiceApplication {
+  id          Int      @id @default(autoincrement())
+  serviceId   Int
+  service     Service  @relation(fields: [serviceId], references: [id])
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  fullName    String
+  email       String
+  cvUrl       String?
+  coverLetter String?
+  status      String   @default("applied") // ApplicationStatus
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([serviceId, userId])
+  @@index([serviceId, status])
+  @@index([userId])
+}
+
+model Setting {
+  key       String   @id
+  value     String?
+  json      String?  // JSON stored as TEXT in SQLite
+  updatedAt DateTime @updatedAt
+}
+
+model JobReview {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  job       Job      @relation(fields: [jobId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+}
+
+model Contact {
+  id          Int      @id @default(autoincrement())
+  firstName   String
+  lastName    String?
+  email       String
+  phoneNumber String?
+  message     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+}

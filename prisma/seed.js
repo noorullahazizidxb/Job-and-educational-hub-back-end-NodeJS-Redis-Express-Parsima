@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import fs from 'fs';
-import path from 'path';
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
 
 // Reuse the shared Prisma client when possible to avoid extra DB connections
 // during seeding in development. We import from the app lib if available.
@@ -11,7 +11,7 @@ try {
   // Try to import the shared client from src (works when run in project root)
   // Use dynamic import to avoid load-time issues when running `prisma db seed` externally.
   // eslint-disable-next-line no-undef
-  const shared = await import(path.resolve(process.cwd(), 'src/lib/prisma.js'));
+  const shared = await import(path.resolve(process.cwd(), "src/lib/prisma.js"));
   prisma = shared.prisma;
 } catch (e) {
   // Fallback to creating a local client for environments where src/lib/prisma.js isn't resolvable
@@ -19,34 +19,47 @@ try {
 }
 
 function toSlug(s) {
-  return s.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 }
 
 async function main() {
   // Ensure uploads dir and copy sample PDFs for testing
-  const uploadsDir = path.resolve(process.cwd(), 'uploads');
+  const uploadsDir = path.resolve(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  const sourceCv = path.resolve(process.cwd(), 'cv.pdf');
-  const sourceCover = path.resolve(process.cwd(), 'coverletter.pdf');
-  const destCv = path.join(uploadsDir, 'cv.pdf');
-  const destCover = path.join(uploadsDir, 'coverletter.pdf');
-  try { if (fs.existsSync(sourceCv) && !fs.existsSync(destCv)) fs.copyFileSync(sourceCv, destCv); } catch {}
-  try { if (fs.existsSync(sourceCover) && !fs.existsSync(destCover)) fs.copyFileSync(sourceCover, destCover); } catch {}
+  const sourceCv = path.resolve(process.cwd(), "cv.pdf");
+  const sourceCover = path.resolve(process.cwd(), "coverletter.pdf");
+  const destCv = path.join(uploadsDir, "cv.pdf");
+  const destCover = path.join(uploadsDir, "coverletter.pdf");
+  try {
+    if (fs.existsSync(sourceCv) && !fs.existsSync(destCv))
+      fs.copyFileSync(sourceCv, destCv);
+  } catch {}
+  try {
+    if (fs.existsSync(sourceCover) && !fs.existsSync(destCover))
+      fs.copyFileSync(sourceCover, destCover);
+  } catch {}
   // Cities
   const citiesData = [
-    { name: 'Kabul', province: 'Kabul', country: 'Afghanistan' },
-    { name: 'Herat', province: 'Herat', country: 'Afghanistan' },
-    { name: 'Mazar-i-Sharif', province: 'Balkh', country: 'Afghanistan' },
-    { name: 'Kandahar', province: 'Kandahar', country: 'Afghanistan' },
-    { name: 'Jalalabad', province: 'Nangarhar', country: 'Afghanistan' },
-    { name: 'Kunduz', province: 'Kunduz', country: 'Afghanistan' },
-    { name: 'Ghazni', province: 'Ghazni', country: 'Afghanistan' },
-    { name: 'Bamyan', province: 'Bamyan', country: 'Afghanistan' },
-    { name: 'Maimana', province: 'Faryab', country: 'Afghanistan' },
-    { name: 'Sheberghan', province: 'Jowzjan', country: 'Afghanistan' },
+    { name: "Kabul", province: "Kabul", country: "Afghanistan" },
+    { name: "Herat", province: "Herat", country: "Afghanistan" },
+    { name: "Mazar-i-Sharif", province: "Balkh", country: "Afghanistan" },
+    { name: "Kandahar", province: "Kandahar", country: "Afghanistan" },
+    { name: "Jalalabad", province: "Nangarhar", country: "Afghanistan" },
+    { name: "Kunduz", province: "Kunduz", country: "Afghanistan" },
+    { name: "Ghazni", province: "Ghazni", country: "Afghanistan" },
+    { name: "Bamyan", province: "Bamyan", country: "Afghanistan" },
+    { name: "Maimana", province: "Faryab", country: "Afghanistan" },
+    { name: "Sheberghan", province: "Jowzjan", country: "Afghanistan" },
   ];
   for (const c of citiesData) {
-    const existing = await prisma.city.findFirst({ where: { name: c.name, country: c.country } });
+    const existing = await prisma.city.findFirst({
+      where: { name: c.name, country: c.country },
+    });
     if (existing) {
       await prisma.city.update({ where: { id: existing.id }, data: c });
     } else {
@@ -55,7 +68,18 @@ async function main() {
   }
 
   // Categories (ensure at least 10)
-  const categories = ['Engineering', 'Design', 'Marketing', 'Finance', 'HR', 'Sales', 'Operations', 'Support', 'Legal', 'IT'];
+  const categories = [
+    "Engineering",
+    "Design",
+    "Marketing",
+    "Finance",
+    "HR",
+    "Sales",
+    "Operations",
+    "Support",
+    "Legal",
+    "IT",
+  ];
   for (const name of categories) {
     const slug = toSlug(name);
     await prisma.category.upsert({
@@ -67,46 +91,64 @@ async function main() {
 
   // Get categories map (slug -> id)
   const categoryRows = await prisma.category.findMany();
-  const categoryBySlug = Object.fromEntries(categoryRows.map((c) => [c.slug, c.id]));
+  const categoryBySlug = Object.fromEntries(
+    categoryRows.map((c) => [c.slug, c.id]),
+  );
 
-  // Admin user
-  const adminEmail = 'admin@example.com';
-  const adminPass = 'password123';
+  // Admin user (allow overriding via env vars for local/dev)
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
+  const adminPass = process.env.ADMIN_PASSWORD || "password123";
   const adminHash = await bcrypt.hash(adminPass, 10);
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { role: 'admin' },
-  create: { email: adminEmail, passwordHash: adminHash, role: 'admin', name: 'Site Admin', about: 'Administrator account', skills: null, phone: null, address: null },
+    update: { role: "admin" },
+    create: {
+      email: adminEmail,
+      passwordHash: adminHash,
+      role: "admin",
+      name: "Site Admin",
+      about: "Administrator account",
+      skills: null,
+      phone: null,
+      address: null,
+    },
   });
 
   // Companies + company users (ensure at least 10 companies)
   // Reusable logo URLs provided by the user
   const logoUrls = [
-    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcToIq3KIVyxaLMZ1w4Y-FrZDpw4TU5Kvv1i3g&s',
-    'https://www.allrecipes.com/thmb/wyo41T1opm7uI0jUj6iVkwsicYQ=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/AR-Coke-4x3-4-68e225a056314b0a8a0b549f433f0b81.jpg',
-    'https://images.seeklogo.com/logo-png/49/1/ariana-afghan-airlines-logo-png_seeklogo-497725.png',
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcToIq3KIVyxaLMZ1w4Y-FrZDpw4TU5Kvv1i3g&s",
+    "https://www.allrecipes.com/thmb/wyo41T1opm7uI0jUj6iVkwsicYQ=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/AR-Coke-4x3-4-68e225a056314b0a8a0b549f433f0b81.jpg",
+    "https://images.seeklogo.com/logo-png/49/1/ariana-afghan-airlines-logo-png_seeklogo-497725.png",
     // shortened: replaced inlined base64 logos with remote image URLs to avoid DB column overflow
-    'https://upload.wikimedia.org/wikipedia/commons/4/44/Logo_2013_Google.png'
+    "https://upload.wikimedia.org/wikipedia/commons/4/44/Logo_2013_Google.png",
   ];
   const company = await prisma.company.upsert({
-    where: { slug: 'acme-corp' },
-    update: { name: 'Acme Corp', logoUrl: logoUrls[0] },
+    where: { slug: "acme-corp" },
+    update: { name: "Acme Corp", logoUrl: logoUrls[0] },
     create: {
-      name: 'Acme Corp',
-      slug: 'acme-corp',
-      website: 'https://acme.example.com',
+      name: "Acme Corp",
+      slug: "acme-corp",
+      website: "https://acme.example.com",
       logoUrl: logoUrls[0],
-      industry: 'Technology',
-      size: '51-200',
-      about: 'We build awesome stuff.',
-      description: 'Longer description about Acme.',
-      address: '123 Main St',
+      industry: "Technology",
+      size: "51-200",
+      about: "We build awesome stuff.",
+      description: "Longer description about Acme.",
+      address: "123 Main St",
     },
   });
 
   const moreCompanies = [
-    'Globex Corporation','Initech','Umbrella Corp','Stark Industries','Wayne Enterprises',
-    'Hooli','Soylent Corp','Cyberdyne Systems','Wonka Industries'
+    "Globex Corporation",
+    "Initech",
+    "Umbrella Corp",
+    "Stark Industries",
+    "Wayne Enterprises",
+    "Hooli",
+    "Soylent Corp",
+    "Cyberdyne Systems",
+    "Wonka Industries",
   ];
   const companies = [company];
   for (const name of moreCompanies) {
@@ -119,33 +161,53 @@ async function main() {
         slug,
         website: `https://${slug}.example.com`,
         logoUrl: logoUrls[companies.length % logoUrls.length],
-        industry: 'Technology',
-        size: '11-50',
+        industry: "Technology",
+        size: "11-50",
         about: `${name} about`,
         description: `${name} description`,
-        address: 'Some Street',
+        address: "Some Street",
       },
     });
     companies.push(c);
   }
 
-  const companyEmail = 'company@example.com';
-  const companyHash = await bcrypt.hash('password123', 10);
+  const companyEmail = "company@example.com";
+  const companyHash = await bcrypt.hash("password123", 10);
   await prisma.user.upsert({
     where: { email: companyEmail },
-    update: { role: 'company', companyId: company.id },
-  create: { email: companyEmail, passwordHash: companyHash, role: 'company', name: 'Acme HR', companyId: company.id, about: 'HR contact for Acme', skills: null, phone: '020000000', address: '123 Main St' },
+    update: { role: "company", companyId: company.id },
+    create: {
+      email: companyEmail,
+      passwordHash: companyHash,
+      role: "company",
+      name: "Acme HR",
+      companyId: company.id,
+      about: "HR contact for Acme",
+      skills: null,
+      phone: "020000000",
+      address: "123 Main St",
+    },
   });
   // Additional company users for the other companies
   let idxCompany = 1;
   for (let i = 1; i < companies.length; i++) {
     const c = companies[i];
     const email = `company${i}@example.com`;
-    const hash = await bcrypt.hash('password123', 10);
+    const hash = await bcrypt.hash("password123", 10);
     await prisma.user.upsert({
       where: { email },
-      update: { role: 'company', companyId: c.id },
-  create: { email, passwordHash: hash, role: 'company', name: `HR ${c.name}`, companyId: c.id, about: `HR for ${c.name}`, skills: null, phone: null, address: null },
+      update: { role: "company", companyId: c.id },
+      create: {
+        email,
+        passwordHash: hash,
+        role: "company",
+        name: `HR ${c.name}`,
+        companyId: c.id,
+        about: `HR for ${c.name}`,
+        skills: null,
+        phone: null,
+        address: null,
+      },
     });
     idxCompany++;
   }
@@ -153,66 +215,79 @@ async function main() {
   // Add common users to reach at least 10 users total
   for (let i = 1; i <= 8; i++) {
     const email = `user${i}@example.com`;
-    const hash = await bcrypt.hash('password123', 10);
+    const hash = await bcrypt.hash("password123", 10);
     await prisma.user.upsert({
       where: { email },
-  update: { name: `User ${i}` },
-  create: { email, passwordHash: hash, role: 'common', name: `User ${i}`, about: `I am User ${i}`, skills: 'communication,teamwork', phone: null, address: null },
+      update: { name: `User ${i}` },
+      create: {
+        email,
+        passwordHash: hash,
+        role: "common",
+        name: `User ${i}`,
+        about: `I am User ${i}`,
+        skills: "communication,teamwork",
+        phone: null,
+        address: null,
+      },
     });
   }
 
   // Resolve cities for referencing in jobs
-  const cityKabul = await prisma.city.findFirst({ where: { name: 'Kabul' } });
-  const cityHerat = await prisma.city.findFirst({ where: { name: 'Herat' } });
-  const cityMazar = await prisma.city.findFirst({ where: { name: 'Mazar-i-Sharif' } });
+  const cityKabul = await prisma.city.findFirst({ where: { name: "Kabul" } });
+  const cityHerat = await prisma.city.findFirst({ where: { name: "Herat" } });
+  const cityMazar = await prisma.city.findFirst({
+    where: { name: "Mazar-i-Sharif" },
+  });
 
   // A sample job (complete attributes)
   const job = await prisma.job.upsert({
-    where: { slug: 'frontend-developer-acme' },
+    where: { slug: "frontend-developer-acme" },
     update: {
-      title: 'Frontend Developer',
-      type: 'full_time',
-      location: 'Kabul',
+      title: "Frontend Developer",
+      type: "full_time",
+      location: "Kabul",
       salaryMin: 800,
       salaryMax: 2000,
-      currency: 'USD',
-      description: 'Build and ship UI for our core product using React and Tailwind.',
-      skills: 'React, TypeScript, Tailwind, REST',
-      benefits: 'Health Insurance,Paid Time Off,Remote Work',
-      applyEmail: 'careers@acme.example.com',
-      contactEmail: 'hr@acme.example.com',
+      currency: "USD",
+      description:
+        "Build and ship UI for our core product using React and Tailwind.",
+      skills: "React, TypeScript, Tailwind, REST",
+      benefits: "Health Insurance,Paid Time Off,Remote Work",
+      applyEmail: "careers@acme.example.com",
+      contactEmail: "hr@acme.example.com",
       closingDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
       vacancies: 2,
-      experience: 'mid',
-      education: 'bachelor',
-      gender: 'any',
-      orgType: 'private',
-      status: 'published',
+      experience: "mid",
+      education: "bachelor",
+      gender: "any",
+      orgType: "private",
+      status: "published",
       featured: true,
       featuredUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-  cityId: cityKabul?.id || null,
+      cityId: cityKabul?.id || null,
     },
     create: {
-      slug: 'frontend-developer-acme',
-      title: 'Frontend Developer',
-      type: 'full_time',
-      location: 'Kabul',
+      slug: "frontend-developer-acme",
+      title: "Frontend Developer",
+      type: "full_time",
+      location: "Kabul",
       salaryMin: 800,
       salaryMax: 2000,
-      currency: 'USD',
-      description: 'Build and ship UI for our core product using React and Tailwind.',
-      skills: 'React, TypeScript, Tailwind, REST',
-      benefits: 'Health Insurance,Paid Time Off,Remote Work',
-      applyEmail: 'careers@acme.example.com',
-      contactEmail: 'hr@acme.example.com',
+      currency: "USD",
+      description:
+        "Build and ship UI for our core product using React and Tailwind.",
+      skills: "React, TypeScript, Tailwind, REST",
+      benefits: "Health Insurance,Paid Time Off,Remote Work",
+      applyEmail: "careers@acme.example.com",
+      contactEmail: "hr@acme.example.com",
       postedAt: new Date(),
       closingDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
       vacancies: 2,
-      experience: 'mid',
-      education: 'bachelor',
-      gender: 'any',
-      orgType: 'private',
-      status: 'published',
+      experience: "mid",
+      education: "bachelor",
+      gender: "any",
+      orgType: "private",
+      status: "published",
       featured: true,
       featuredUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       cityId: cityKabul?.id || null,
@@ -222,8 +297,10 @@ async function main() {
 
   // Ensure primary job has many-to-many categories (e.g., Engineering, IT)
   if (job) {
-    const desiredCats = ['engineering', 'it'];
-    const desiredIds = desiredCats.map((s) => categoryBySlug[s]).filter(Boolean);
+    const desiredCats = ["engineering", "it"];
+    const desiredIds = desiredCats
+      .map((s) => categoryBySlug[s])
+      .filter(Boolean);
     for (const cid of desiredIds) {
       await prisma.jobCategory.upsert({
         where: { jobId_categoryId: { jobId: job.id, categoryId: cid } },
@@ -234,9 +311,16 @@ async function main() {
   }
 
   // Create 10 additional complete jobs for testing (distributed across companies)
-  const jobTypes = ['full_time', 'part_time', 'contract', 'internship', 'temporary', 'remote'];
-  const experiences = ['entry', 'mid', 'senior', 'lead'];
-  const educations = ['diploma', 'bachelor', 'master'];
+  const jobTypes = [
+    "full_time",
+    "part_time",
+    "contract",
+    "internship",
+    "temporary",
+    "remote",
+  ];
+  const experiences = ["entry", "mid", "senior", "lead"];
+  const educations = ["diploma", "bachelor", "master"];
   const cities = [cityKabul, cityHerat, cityMazar].filter(Boolean);
   const categorySlugs = Object.keys(categoryBySlug);
 
@@ -247,14 +331,16 @@ async function main() {
     const exp = experiences[i % experiences.length];
     const edu = educations[i % educations.length];
     const city = cities[i % cities.length];
-    const location = city?.name || 'Kabul';
-  const catSlug = categorySlugs[i % categorySlugs.length];
-  const catId = categoryBySlug[catSlug];
+    const location = city?.name || "Kabul";
+    const catSlug = categorySlugs[i % categorySlugs.length];
+    const catId = categoryBySlug[catSlug];
     const postedAt = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
     const featured = i % 3 === 0;
-    const featuredUntil = featured ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null;
+    const featuredUntil = featured
+      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      : null;
 
-  const created = await prisma.job.upsert({
+    const created = await prisma.job.upsert({
       where: { slug },
       update: {
         title,
@@ -262,24 +348,24 @@ async function main() {
         location,
         salaryMin: 400 + i * 50,
         salaryMax: 1000 + i * 80,
-        currency: 'USD',
+        currency: "USD",
         description: `Comprehensive seeded job ${i} for testing all attributes and listings.`,
-        skills: 'JavaScript,Node.js,SQL,Docker',
-        benefits: 'Health Insurance,Paid Time Off,Annual Bonus,Remote Work',
+        skills: "JavaScript,Node.js,SQL,Docker",
+        benefits: "Health Insurance,Paid Time Off,Annual Bonus,Remote Work",
         applyUrl: `https://acme.example.com/jobs/${slug}`,
-        contactEmail: 'hr@acme.example.com',
+        contactEmail: "hr@acme.example.com",
         postedAt,
         closingDate: new Date(Date.now() + (20 + i) * 24 * 60 * 60 * 1000),
         vacancies: (i % 4) + 1,
         experience: exp,
         education: edu,
-        gender: 'any',
-        orgType: 'private',
-        status: 'published',
+        gender: "any",
+        orgType: "private",
+        status: "published",
         featured,
         featuredUntil,
         cityId: city?.id || null,
-  companyId: companies[i % companies.length].id,
+        companyId: companies[i % companies.length].id,
       },
       create: {
         slug,
@@ -288,30 +374,32 @@ async function main() {
         location,
         salaryMin: 400 + i * 50,
         salaryMax: 1000 + i * 80,
-        currency: 'USD',
+        currency: "USD",
         description: `Comprehensive seeded job ${i} for testing all attributes and listings.`,
-        skills: 'JavaScript,Node.js,SQL,Docker',
-        benefits: 'Health Insurance,Paid Time Off,Annual Bonus,Remote Work',
+        skills: "JavaScript,Node.js,SQL,Docker",
+        benefits: "Health Insurance,Paid Time Off,Annual Bonus,Remote Work",
         applyUrl: `https://acme.example.com/jobs/${slug}`,
-        contactEmail: 'hr@acme.example.com',
+        contactEmail: "hr@acme.example.com",
         postedAt,
         closingDate: new Date(Date.now() + (20 + i) * 24 * 60 * 60 * 1000),
         vacancies: (i % 4) + 1,
         experience: exp,
         education: edu,
-        gender: 'any',
-        orgType: 'private',
-        status: 'published',
+        gender: "any",
+        orgType: "private",
+        status: "published",
         featured,
         featuredUntil,
         cityId: city?.id || null,
-  companyId: companies[i % companies.length].id,
+        companyId: companies[i % companies.length].id,
       },
     });
 
     // Attach 1-3 categories per job via many-to-many
     const howMany = (i % 3) + 1;
-    const shuffled = [...categorySlugs].sort(() => 0.5 - Math.random()).slice(0, howMany);
+    const shuffled = [...categorySlugs]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, howMany);
     for (const s of shuffled) {
       const cId = categoryBySlug[s];
       if (!cId) continue;
@@ -324,8 +412,14 @@ async function main() {
   }
 
   // Seed job reviews (ensure at least 10)
-  const jobsForReviews = await prisma.job.findMany({ take: 10, orderBy: { id: 'asc' } });
-  const users = await prisma.user.findMany({ where: { role: 'common' }, take: 10 });
+  const jobsForReviews = await prisma.job.findMany({
+    take: 10,
+    orderBy: { id: "asc" },
+  });
+  const users = await prisma.user.findMany({
+    where: { role: "common" },
+    take: 10,
+  });
   let ratingBase = 3;
   // Create at least 10 job reviews. Since unique(jobId,userId) was removed, create new reviews freely.
   let totalReviews = 0;
@@ -336,7 +430,12 @@ async function main() {
       const user = users[u];
       try {
         await prisma.jobReview.create({
-          data: { jobId: j.id, userId: user.id, rating: ((ratingBase + u) % 5) + 1, comment: `Seeded review ${u + 1} for job ${j.slug}` },
+          data: {
+            jobId: j.id,
+            userId: user.id,
+            rating: ((ratingBase + u) % 5) + 1,
+            comment: `Seeded review ${u + 1} for job ${j.slug}`,
+          },
         });
         totalReviews++;
       } catch (err) {
@@ -354,34 +453,56 @@ async function main() {
       const j = allJobs[Math.floor(Math.random() * allJobs.length)];
       const u = allUsers[Math.floor(Math.random() * allUsers.length)];
       try {
-        await prisma.jobReview.create({ data: { jobId: j.id, userId: u.id, rating: (Math.floor(Math.random() * 5) + 1), comment: `Extra seeded review for job ${j.slug}` } });
+        await prisma.jobReview.create({
+          data: {
+            jobId: j.id,
+            userId: u.id,
+            rating: Math.floor(Math.random() * 5) + 1,
+            comment: `Extra seeded review for job ${j.slug}`,
+          },
+        });
         totalReviews++;
       } catch {}
     }
   }
 
   // Seed Notifications: broadcast to all common users, broadcast to all company users, and specific recipients
-  const adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
-  const commonUsers = await prisma.user.findMany({ where: { role: 'common' }, take: 50 });
-  const companyUsers = await prisma.user.findMany({ where: { role: 'company' }, take: 50 });
-  const someSpecificUsers = [commonUsers[0], commonUsers[1], companyUsers[0]].filter(Boolean);
+  const adminUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+  const commonUsers = await prisma.user.findMany({
+    where: { role: "common" },
+    take: 50,
+  });
+  const companyUsers = await prisma.user.findMany({
+    where: { role: "company" },
+    take: 50,
+  });
+  const someSpecificUsers = [
+    commonUsers[0],
+    commonUsers[1],
+    companyUsers[0],
+  ].filter(Boolean);
   const someCompanies = await prisma.company.findMany({ take: 3 });
 
   // 1) Broadcast to all common users
   try {
     const notifCommon = await prisma.notification.create({
       data: {
-        title: 'Welcome commons',
-        body: 'Hello common users — this is a broadcast message.',
+        title: "Welcome commons",
+        body: "Hello common users — this is a broadcast message.",
         link: null,
         createdById: adminUser?.id || null,
         targetAll: false,
-        targetRole: 'common',
+        targetRole: "common",
       },
     });
     if (commonUsers.length) {
       await prisma.notificationRecipient.createMany({
-        data: commonUsers.map((u) => ({ notificationId: notifCommon.id, userId: u.id })),
+        data: commonUsers.map((u) => ({
+          notificationId: notifCommon.id,
+          userId: u.id,
+        })),
         skipDuplicates: true,
       });
     }
@@ -391,17 +512,20 @@ async function main() {
   try {
     const notifCompany = await prisma.notification.create({
       data: {
-        title: 'Welcome companies',
-        body: 'Hello company users — important update for organizations.',
+        title: "Welcome companies",
+        body: "Hello company users — important update for organizations.",
         link: null,
         createdById: adminUser?.id || null,
         targetAll: false,
-        targetRole: 'company',
+        targetRole: "company",
       },
     });
     if (companyUsers.length) {
       await prisma.notificationRecipient.createMany({
-        data: companyUsers.map((u) => ({ notificationId: notifCompany.id, userId: u.id })),
+        data: companyUsers.map((u) => ({
+          notificationId: notifCompany.id,
+          userId: u.id,
+        })),
         skipDuplicates: true,
       });
     }
@@ -411,39 +535,48 @@ async function main() {
   try {
     const notifSpecific = await prisma.notification.create({
       data: {
-        title: 'Direct message',
-        body: 'This notification was sent to specific recipients only.',
-        link: 'https://example.com/special',
+        title: "Direct message",
+        body: "This notification was sent to specific recipients only.",
+        link: "https://example.com/special",
         createdById: adminUser?.id || null,
         targetAll: false,
         targetRole: null,
       },
     });
     const creates = [
-      ...someSpecificUsers.map((u) => ({ notificationId: notifSpecific.id, userId: u.id })),
-      ...someCompanies.map((c) => ({ notificationId: notifSpecific.id, companyId: c.id })),
+      ...someSpecificUsers.map((u) => ({
+        notificationId: notifSpecific.id,
+        userId: u.id,
+      })),
+      ...someCompanies.map((c) => ({
+        notificationId: notifSpecific.id,
+        companyId: c.id,
+      })),
     ];
     if (creates.length) {
-      await prisma.notificationRecipient.createMany({ data: creates, skipDuplicates: true });
+      await prisma.notificationRecipient.createMany({
+        data: creates,
+        skipDuplicates: true,
+      });
     }
   } catch {}
 
   // Seed at least 10 services
   const service = await prisma.service.upsert({
-    where: { slug: 'acme-scholarship-2025' },
-    update: { title: 'Acme Scholarship 2025' },
+    where: { slug: "acme-scholarship-2025" },
+    update: { title: "Acme Scholarship 2025" },
     create: {
-      type: 'scholarship',
-      title: 'Acme Scholarship 2025',
-      slug: 'acme-scholarship-2025',
-      description: 'Scholarship details...',
-      organization: 'Acme Foundation',
+      type: "scholarship",
+      title: "Acme Scholarship 2025",
+      slug: "acme-scholarship-2025",
+      description: "Scholarship details...",
+      organization: "Acme Foundation",
       companyId: company.id,
-      country: 'Afghanistan',
-      category: 'STEM',
-      tags: 'scholarship,education',
-      eligibility: 'Undergrad',
-      status: 'published',
+      country: "Afghanistan",
+      category: "STEM",
+      tags: "scholarship,education",
+      eligibility: "Undergrad",
+      status: "published",
     },
   });
 
@@ -454,17 +587,17 @@ async function main() {
       where: { slug: sSlug },
       update: { title: `Acme Scholarship 2025 #${i}` },
       create: {
-        type: i % 2 === 0 ? 'procurement' : 'scholarship',
-        title: `Acme ${i % 2 === 0 ? 'Procurement' : 'Scholarship'} ${2025}`,
+        type: i % 2 === 0 ? "procurement" : "scholarship",
+        title: `Acme ${i % 2 === 0 ? "Procurement" : "Scholarship"} ${2025}`,
         slug: sSlug,
-        description: 'Seeded service for testing.',
-        organization: 'Acme Foundation',
+        description: "Seeded service for testing.",
+        organization: "Acme Foundation",
         companyId: company.id,
-        country: 'Afghanistan',
-        category: i % 2 === 0 ? 'IT' : 'Education',
-        tags: 'seed,test',
-        eligibility: 'Open',
-        status: 'published',
+        country: "Afghanistan",
+        category: i % 2 === 0 ? "IT" : "Education",
+        tags: "seed,test",
+        eligibility: "Open",
+        status: "published",
       },
     });
   }
@@ -472,23 +605,23 @@ async function main() {
   // Seed at least 10 advertisements
   // Reusable advertisement image URLs to populate ad records
   const adImageUrls = [
-    'https://images.unsplash.com/photo-1508830524289-0adcbe822b40?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1506765515384-028b60a970df?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1448932223592-d1fc686e76ea?auto=format&fit=crop&w=1200&q=80'
+    "https://images.unsplash.com/photo-1508830524289-0adcbe822b40?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1506765515384-028b60a970df?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1448932223592-d1fc686e76ea?auto=format&fit=crop&w=1200&q=80",
   ];
   await prisma.advertisement.upsert({
     where: { id: 1 },
-    update: { title: 'Homepage Hero Banner' },
+    update: { title: "Homepage Hero Banner" },
     create: {
-      title: 'Homepage Hero Banner',
-      placement: 'home_page_after_pagenation_1',
+      title: "Homepage Hero Banner",
+      placement: "home_page_after_pagenation_1",
       imageUrl: adImageUrls[0],
-      targetUrl: 'https://example.com',
+      targetUrl: "https://example.com",
       isActive: true,
       priority: 10,
     },
@@ -499,9 +632,10 @@ async function main() {
       update: { title: `Ad ${i}` },
       create: {
         title: `Ad ${i}`,
-        placement: i % 2 === 0 ? 'home_page_after_pagenation_2' : 'job_list_top',
+        placement:
+          i % 2 === 0 ? "home_page_after_pagenation_2" : "job_list_top",
         imageUrl: adImageUrls[i % adImageUrls.length],
-        targetUrl: 'https://example.com',
+        targetUrl: "https://example.com",
         isActive: i % 3 !== 0,
         priority: i,
       },
@@ -513,21 +647,31 @@ async function main() {
   if (admin && job) {
     await prisma.jobApplication.upsert({
       where: { jobId_userId: { jobId: job.id, userId: admin.id } },
-      update: { cvUrl: fs.existsSync(destCv) ? '/uploads/cv.pdf' : null, coverLetter: fs.existsSync(destCover) ? '/uploads/coverletter.pdf' : null },
+      update: {
+        cvUrl: fs.existsSync(destCv) ? "/uploads/cv.pdf" : null,
+        coverLetter: fs.existsSync(destCover)
+          ? "/uploads/coverletter.pdf"
+          : null,
+      },
       create: {
         jobId: job.id,
         userId: admin.id,
-        fullName: 'Seeded Admin',
+        fullName: "Seeded Admin",
         email: adminEmail,
-        cvUrl: fs.existsSync(destCv) ? '/uploads/cv.pdf' : null,
-        coverLetter: fs.existsSync(destCover) ? '/uploads/coverletter.pdf' : null,
-        status: 'applied',
+        cvUrl: fs.existsSync(destCv) ? "/uploads/cv.pdf" : null,
+        coverLetter: fs.existsSync(destCover)
+          ? "/uploads/coverletter.pdf"
+          : null,
+        status: "applied",
       },
     });
   }
   // Additional job applications for coverage (10 total)
   if (admin) {
-    const jobs = await prisma.job.findMany({ take: 10, orderBy: { id: 'asc' } });
+    const jobs = await prisma.job.findMany({
+      take: 10,
+      orderBy: { id: "asc" },
+    });
     let idx = 0;
     for (const j of jobs) {
       await prisma.jobApplication.upsert({
@@ -538,7 +682,7 @@ async function main() {
           userId: admin.id,
           fullName: `Admin Applicant ${++idx}`,
           email: adminEmail,
-          status: 'applied',
+          status: "applied",
         },
       });
     }
@@ -546,21 +690,31 @@ async function main() {
   if (admin && service) {
     await prisma.serviceApplication.upsert({
       where: { serviceId_userId: { serviceId: service.id, userId: admin.id } },
-      update: { cvUrl: fs.existsSync(destCv) ? '/uploads/cv.pdf' : null, coverLetter: fs.existsSync(destCover) ? '/uploads/coverletter.pdf' : null },
+      update: {
+        cvUrl: fs.existsSync(destCv) ? "/uploads/cv.pdf" : null,
+        coverLetter: fs.existsSync(destCover)
+          ? "/uploads/coverletter.pdf"
+          : null,
+      },
       create: {
         serviceId: service.id,
         userId: admin.id,
-        fullName: 'Seeded Admin',
+        fullName: "Seeded Admin",
         email: adminEmail,
-        cvUrl: fs.existsSync(destCv) ? '/uploads/cv.pdf' : null,
-        coverLetter: fs.existsSync(destCover) ? '/uploads/coverletter.pdf' : null,
-        status: 'applied',
+        cvUrl: fs.existsSync(destCv) ? "/uploads/cv.pdf" : null,
+        coverLetter: fs.existsSync(destCover)
+          ? "/uploads/coverletter.pdf"
+          : null,
+        status: "applied",
       },
     });
   }
   // Additional service applications (ensure ~10)
   if (admin) {
-    const services = await prisma.service.findMany({ take: 10, orderBy: { id: 'asc' } });
+    const services = await prisma.service.findMany({
+      take: 10,
+      orderBy: { id: "asc" },
+    });
     let idx = 0;
     for (const s of services) {
       await prisma.serviceApplication.upsert({
@@ -571,7 +725,7 @@ async function main() {
           userId: admin.id,
           fullName: `Admin Applicant S${++idx}`,
           email: adminEmail,
-          status: 'applied',
+          status: "applied",
         },
       });
     }
@@ -581,10 +735,10 @@ async function main() {
   const TARGET = 50;
 
   // Refresh lists
-  let allCompanies = await prisma.company.findMany({ orderBy: { id: 'asc' } });
-  let allUsers = await prisma.user.findMany({ orderBy: { id: 'asc' } });
-  let allJobs = await prisma.job.findMany({ orderBy: { id: 'asc' } });
-  let allServices = await prisma.service.findMany({ orderBy: { id: 'asc' } });
+  let allCompanies = await prisma.company.findMany({ orderBy: { id: "asc" } });
+  let allUsers = await prisma.user.findMany({ orderBy: { id: "asc" } });
+  let allJobs = await prisma.job.findMany({ orderBy: { id: "asc" } });
+  let allServices = await prisma.service.findMany({ orderBy: { id: "asc" } });
 
   // Create companies until TARGET
   let createdCompanies = 0;
@@ -594,20 +748,35 @@ async function main() {
     const slug = toSlug(`${name}-${i}-${Date.now().toString().slice(-4)}`);
     // pick a logoUrl from the provided list (use current length as index seed)
     const logoForNew = logoUrls[allCompanies.length % logoUrls.length];
-    const c = await prisma.company.create({ data: { name, slug, website: `https://${slug}.example.com`, logoUrl: logoForNew, industry: 'Services', size: '11-50', about: `${name} about`, description: `${name} description`, address: 'Seed Address' } });
+    const c = await prisma.company.create({
+      data: {
+        name,
+        slug,
+        website: `https://${slug}.example.com`,
+        logoUrl: logoForNew,
+        industry: "Services",
+        size: "11-50",
+        about: `${name} about`,
+        description: `${name} description`,
+        address: "Seed Address",
+      },
+    });
     allCompanies.push(c);
     createdCompanies++;
     if (createdCompanies > TARGET * 2) break;
   }
 
   // Ensure any existing companies that were created without a logoUrl get assigned one from logoUrls
-  allCompanies = await prisma.company.findMany({ orderBy: { id: 'asc' } });
+  allCompanies = await prisma.company.findMany({ orderBy: { id: "asc" } });
   for (let idx = 0; idx < allCompanies.length; idx++) {
     const comp = allCompanies[idx];
     if (!comp.logoUrl) {
       const newLogo = logoUrls[idx % logoUrls.length];
       try {
-        await prisma.company.update({ where: { id: comp.id }, data: { logoUrl: newLogo } });
+        await prisma.company.update({
+          where: { id: comp.id },
+          data: { logoUrl: newLogo },
+        });
       } catch (err) {
         // ignore per-company failures to avoid blocking seeding
       }
@@ -616,14 +785,23 @@ async function main() {
 
   // Create users (mix of common and company) until TARGET
   let createdUsers = 0;
-  const commonStart = allUsers.filter((u) => u.role === 'common').length;
+  const commonStart = allUsers.filter((u) => u.role === "common").length;
   while (allUsers.length < TARGET) {
     const i = allUsers.length + 1;
     const email = `seeduser${i}@example.com`;
-    const hash = await bcrypt.hash('password123', 10);
+    const hash = await bcrypt.hash("password123", 10);
     // Alternate assigning some users to companies
-    const assignCompany = i % 3 === 0 ? allCompanies[i % allCompanies.length].id : null;
-    const u = await prisma.user.create({ data: { email, passwordHash: hash, role: assignCompany ? 'company' : 'common', name: `Seed User ${i}`, companyId: assignCompany } });
+    const assignCompany =
+      i % 3 === 0 ? allCompanies[i % allCompanies.length].id : null;
+    const u = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: hash,
+        role: assignCompany ? "company" : "common",
+        name: `Seed User ${i}`,
+        companyId: assignCompany,
+      },
+    });
     allUsers.push(u);
     createdUsers++;
     if (createdUsers > TARGET * 2) break;
@@ -631,43 +809,58 @@ async function main() {
 
   // Create jobs until TARGET
   let jobCounter = allJobs.length;
-  const jobTypesArr = ['full_time', 'part_time', 'contract', 'internship', 'temporary', 'remote'];
+  const jobTypesArr = [
+    "full_time",
+    "part_time",
+    "contract",
+    "internship",
+    "temporary",
+    "remote",
+  ];
   while (allJobs.length < TARGET) {
     jobCounter++;
     const title = `Bulk Seed Job ${jobCounter}`;
-    const slug = toSlug(`${title}-${jobCounter}-${Date.now().toString().slice(-4)}`);
+    const slug = toSlug(
+      `${title}-${jobCounter}-${Date.now().toString().slice(-4)}`,
+    );
     const company = allCompanies[jobCounter % allCompanies.length];
     const city = cities[jobCounter % cities.length];
-    const created = await prisma.job.create({ data: {
-      slug,
-      title,
-      type: jobTypesArr[jobCounter % jobTypesArr.length],
-      location: city?.name || 'Kabul',
-      salaryMin: 300 + (jobCounter * 10),
-      salaryMax: 800 + (jobCounter * 10),
-      currency: 'USD',
-      description: `Bulk seeded job ${jobCounter}`,
-      skills: 'Node.js,SQL',
-      applyUrl: `https://example.com/jobs/${slug}`,
-      postedAt: new Date(),
-      closingDate: new Date(Date.now() + (30 + jobCounter) * 24 * 60 * 60 * 1000),
-      vacancies: 1,
-      experience: experiences[jobCounter % experiences.length],
-      education: educations[jobCounter % educations.length],
-      gender: 'any',
-      orgType: 'private',
-      status: 'published',
-      featured: jobCounter % 5 === 0,
-      cityId: city?.id || null,
-      companyId: company.id,
-    } });
+    const created = await prisma.job.create({
+      data: {
+        slug,
+        title,
+        type: jobTypesArr[jobCounter % jobTypesArr.length],
+        location: city?.name || "Kabul",
+        salaryMin: 300 + jobCounter * 10,
+        salaryMax: 800 + jobCounter * 10,
+        currency: "USD",
+        description: `Bulk seeded job ${jobCounter}`,
+        skills: "Node.js,SQL",
+        applyUrl: `https://example.com/jobs/${slug}`,
+        postedAt: new Date(),
+        closingDate: new Date(
+          Date.now() + (30 + jobCounter) * 24 * 60 * 60 * 1000,
+        ),
+        vacancies: 1,
+        experience: experiences[jobCounter % experiences.length],
+        education: educations[jobCounter % educations.length],
+        gender: "any",
+        orgType: "private",
+        status: "published",
+        featured: jobCounter % 5 === 0,
+        cityId: city?.id || null,
+        companyId: company.id,
+      },
+    });
     allJobs.push(created);
     // attach a random category
     const cat = categorySlugs[jobCounter % categorySlugs.length];
     const catId = categoryBySlug[cat];
     if (catId) {
       try {
-        await prisma.jobCategory.create({ data: { jobId: created.id, categoryId: catId } });
+        await prisma.jobCategory.create({
+          data: { jobId: created.id, categoryId: catId },
+        });
       } catch {}
     }
     if (allJobs.length > TARGET * 2) break;
@@ -675,37 +868,47 @@ async function main() {
 
   // Create services until TARGET
   let svcCounter = allServices.length;
-  const svcTypes = ['procurement', 'scholarship'];
+  const svcTypes = ["procurement", "scholarship"];
   while (allServices.length < TARGET) {
     svcCounter++;
     const title = `Bulk Seed Service ${svcCounter}`;
-    const slug = toSlug(`${title}-${svcCounter}-${Date.now().toString().slice(-4)}`);
+    const slug = toSlug(
+      `${title}-${svcCounter}-${Date.now().toString().slice(-4)}`,
+    );
     const company = allCompanies[svcCounter % allCompanies.length];
     const city = cities[svcCounter % cities.length];
-    const created = await prisma.service.create({ data: {
-      slug,
-      title,
-      type: svcTypes[svcCounter % svcTypes.length],
-      description: `Bulk seeded service ${svcCounter}`,
-      organization: `Org ${svcCounter}`,
-      companyId: company.id,
-      cityId: city?.id || null,
-      country: 'Afghanistan',
-      category: 'General',
-      tags: 'seed',
-      eligibility: 'Open',
-      status: 'published',
-      postedAt: new Date(),
-      closingDate: new Date(Date.now() + (20 + svcCounter) * 24 * 60 * 60 * 1000),
-    } });
+    const created = await prisma.service.create({
+      data: {
+        slug,
+        title,
+        type: svcTypes[svcCounter % svcTypes.length],
+        description: `Bulk seeded service ${svcCounter}`,
+        organization: `Org ${svcCounter}`,
+        companyId: company.id,
+        cityId: city?.id || null,
+        country: "Afghanistan",
+        category: "General",
+        tags: "seed",
+        eligibility: "Open",
+        status: "published",
+        postedAt: new Date(),
+        closingDate: new Date(
+          Date.now() + (20 + svcCounter) * 24 * 60 * 60 * 1000,
+        ),
+      },
+    });
     allServices.push(created);
     if (allServices.length > TARGET * 2) break;
   }
 
   // Create job applications until TARGET
   let createdJobApps = 0;
-  const availableJobs = allJobs.length ? allJobs : await prisma.job.findMany({});
-  const availableUsers = allUsers.length ? allUsers : await prisma.user.findMany({});
+  const availableJobs = allJobs.length
+    ? allJobs
+    : await prisma.job.findMany({});
+  const availableUsers = allUsers.length
+    ? allUsers
+    : await prisma.user.findMany({});
   let jaIdx = 0;
   while ((await prisma.jobApplication.count()) < TARGET) {
     const j = availableJobs[jaIdx % availableJobs.length];
@@ -719,7 +922,7 @@ async function main() {
           userId: u.id,
           fullName: u.name || `Applicant ${u.id}`,
           email: u.email,
-          status: 'applied',
+          status: "applied",
         },
       });
       createdJobApps++;
@@ -731,7 +934,9 @@ async function main() {
   // Create service applications until TARGET
   let createdSvcApps = 0;
   let saIdx = 0;
-  const availableServices = allServices.length ? allServices : await prisma.service.findMany({});
+  const availableServices = allServices.length
+    ? allServices
+    : await prisma.service.findMany({});
   while ((await prisma.serviceApplication.count()) < TARGET) {
     const s = availableServices[saIdx % availableServices.length];
     const u = availableUsers[(saIdx + 5) % availableUsers.length];
@@ -744,7 +949,7 @@ async function main() {
           userId: u.id,
           fullName: u.name || `Applicant ${u.id}`,
           email: u.email,
-          status: 'applied',
+          status: "applied",
         },
       });
       createdSvcApps++;
@@ -756,7 +961,7 @@ async function main() {
 
 main()
   .then(async () => {
-    console.log('Seed complete');
+    console.log("Seed complete");
     await prisma.$disconnect();
   })
   .catch(async (e) => {
