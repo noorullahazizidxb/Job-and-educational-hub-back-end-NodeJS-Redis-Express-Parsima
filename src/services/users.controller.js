@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { notFound, forbidden, unauthorized } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
-import { enqueueProfileOptimization } from '../middleware/upload.js';
+import { enqueueProfileOptimization, publicFileUrl } from '../middleware/upload.js';
 import { indexUserById, deleteFromIndex, INDEX } from '../lib/searchIndexer.js';
 import { notifyUser } from '../lib/notify.js';
 
@@ -160,7 +160,7 @@ export async function create(req, res, next) {
       address: body.address || null,
   };
 
-  if (photoFile) payload.photo = `/uploads/profile/${photoFile.filename}`;
+  if (photoFile) payload.photo = publicFileUrl(photoFile, '/uploads/profile');
 
   // handle password hashing
     if (body.password) {
@@ -220,7 +220,7 @@ export async function update(req, res, next) {
           try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) { /* ignore deletion errors */ }
         }
       } catch (e) { /* ignore DB/read errors here; update will proceed */ }
-      payload.photo = `/uploads/profile/${photoFile.filename}`;
+      payload.photo = publicFileUrl(photoFile, '/uploads/profile');
     }
 
     // handle password hashing on update

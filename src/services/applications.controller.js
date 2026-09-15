@@ -3,6 +3,7 @@ import { unauthorized, forbidden, notFound } from '../utils/httpError.js';
 import { getJson, setJson, del } from '../lib/cache.js';
 import { indexJobApplicationById, indexServiceApplicationById } from '../lib/searchIndexer.js';
 import { notifyCompany, notifyUser } from '../lib/notify.js';
+import { publicFileUrl } from '../middleware/upload.js';
 
 export async function applyToJob(req, res, next) {
   try {
@@ -24,9 +25,9 @@ export async function applyToJob(req, res, next) {
       answers: body.answers ? tryParseJSON(body.answers) : undefined,
     };
     // set cvUrl/coverLetter only when upload present or non-empty body value
-    if (cv) data.cvUrl = `/uploads/${cv.filename}`;
+    if (cv) data.cvUrl = publicFileUrl(cv, '/uploads');
     else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
-    if (cover) data.coverLetter = `/uploads/${cover.filename}`;
+    if (cover) data.coverLetter = publicFileUrl(cover, '/uploads');
     else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
   const item = await prisma.jobApplication.create({ data });
     // invalidate relevant caches
@@ -100,9 +101,9 @@ export async function applyToService(req, res, next) {
       fullName: applicant.name || applicant.email,
       email: applicant.email,
     };
-    if (cv) data.cvUrl = `/uploads/${cv.filename}`;
+    if (cv) data.cvUrl = publicFileUrl(cv, '/uploads');
     else if (body.cvUrl && String(body.cvUrl).trim()) data.cvUrl = body.cvUrl;
-    if (cover) data.coverLetter = `/uploads/${cover.filename}`;
+    if (cover) data.coverLetter = publicFileUrl(cover, '/uploads');
     else if (body.coverLetter && String(body.coverLetter).trim()) data.coverLetter = body.coverLetter;
   const item = await prisma.serviceApplication.create({ data });
     // invalidate relevant caches

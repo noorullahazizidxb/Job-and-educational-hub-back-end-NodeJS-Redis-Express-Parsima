@@ -2,23 +2,30 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 /**
- * Prisma v6 configuration.
+ * Prisma configuration.
  *
- * Switch between MySQL (production default) and SQLite (local dev) by setting:
- *   DB_PROVIDER=sqlite   → uses prisma/schema.sqlite.prisma + SQLITE_URL
- *   DB_PROVIDER=mysql    → uses prisma/schema.prisma        + DATABASE_URL  (default)
- *
- * Example .env entries:
- *   DB_PROVIDER=sqlite
- *   SQLITE_URL=file:./dev.db
+ * Switch SQL engines with DB_PROVIDER:
+ *   DB_PROVIDER=sqlite       → prisma/schema.sqlite.prisma + SQLITE_URL
+ *   DB_PROVIDER=postgresql   → prisma/schema.postgres.prisma + DATABASE_URL
+ *   DB_PROVIDER=mysql        → prisma/schema.prisma + DATABASE_URL  (default)
  */
-const useSQLite = process.env.DB_PROVIDER === "sqlite";
+const provider = String(process.env.DB_PROVIDER || "mysql").toLowerCase();
+const useSQLite = provider === "sqlite";
+const usePostgres = provider === "postgresql" || provider === "postgres";
 
 export default defineConfig({
-  schema: useSQLite ? "prisma/schema.sqlite.prisma" : "prisma/schema.prisma",
+  schema: useSQLite
+    ? "prisma/schema.sqlite.prisma"
+    : usePostgres
+      ? "prisma/schema.postgres.prisma"
+      : "prisma/schema.prisma",
 
   migrations: {
-    path: useSQLite ? "prisma/migrations-sqlite" : "prisma/migrations",
+    path: useSQLite
+      ? "prisma/migrations-sqlite"
+      : usePostgres
+        ? "prisma/migrations-postgres"
+        : "prisma/migrations",
     seed: "node prisma/seed.js",
   },
 

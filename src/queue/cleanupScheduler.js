@@ -1,5 +1,10 @@
 import { createQueue, createWorker } from '../lib/queue.js';
+import { queueEnabled } from '../lib/runtime.js';
 import { runCleanup } from './dailyCleanup.js';
+
+if (!queueEnabled) {
+  console.log('cleanup scheduler skipped (Redis/queues disabled)');
+}
 
 // Create or reuse a queue for scheduled maintenance tasks
 const q = createQueue('maintenance-tasks');
@@ -9,6 +14,7 @@ const q = createQueue('maintenance-tasks');
 const cronExpr = process.env.CLEANUP_CRON || '30 2 * * *';
 
 async function ensureRepeatable() {
+  if (!queueEnabled) return;
   // Every call removes existing repeatable with same key and re-adds to ensure correctness
   await q.drain();
   await q.clean(0, 1000);

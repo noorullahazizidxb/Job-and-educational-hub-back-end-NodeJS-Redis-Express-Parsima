@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getJson, setJson, del } from '../lib/cache.js';
+import { publicFileUrl } from '../middleware/upload.js';
 
 // List services by companyId
 export async function listByCompany(req, res, next) {
@@ -143,7 +144,7 @@ export async function create(req, res, next) {
     }
     if (files && files.length) {
       // store file paths under documents as array of URLs
-      data.documents = files.map((f) => `/uploads/services/${f.filename}`);
+      data.documents = files.map((f) => publicFileUrl(f, '/uploads/services'));
     }
     const item = await prisma.service.create({ data });
     await del('services:list:{}');
@@ -179,7 +180,7 @@ export async function update(req, res, next) {
         }
       } catch (e) { /* ignore DB/read errors */ }
 
-      data.documents = files.map((f) => `/uploads/services/${f.filename}`);
+      data.documents = files.map((f) => publicFileUrl(f, '/uploads/services'));
     }
     const item = await prisma.service.update({ where: { slug }, data });
     await del('services:list:{}');

@@ -1,17 +1,21 @@
 import { Server } from 'socket.io';
 import { verifyToken } from '../utils/jwt.js';
+import { socketEnabled, corsOrigins } from './runtime.js';
 
 let io = null;
 
 export function initWebSocket(httpServer) {
+  if (!socketEnabled) return null;
+
+  const origin = corsOrigins();
   io = new Server(httpServer, {
-    cors: { origin: '*', methods: ['GET','POST','PATCH','DELETE'] },
+    cors: { origin: origin === true ? '*' : origin, methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
+    path: process.env.SOCKET_IO_PATH || '/socket.io',
   });
 
   io.use((socket, next) => {
-    // Support auth via: query.token or auth.token header
     const token = socket.handshake?.auth?.token || socket.handshake?.query?.token || socket.handshake?.headers?.authorization?.split(' ').pop();
-    if (!token) return next(); // allow anonymous, but they won't join user rooms
+    if (!token) return next();
     try {
       const decoded = verifyToken(String(token));
       socket.user = { ...decoded, id: decoded.sub ?? decoded.id, sub: decoded.sub ?? decoded.id };
@@ -24,7 +28,6 @@ export function initWebSocket(httpServer) {
   io.on('connection', (socket) => {
     const u = socket.user;
     if (u?.id) {
-      // Join personal and company rooms
       socket.join(`user:${u.id}`);
       if (u.companyId) socket.join(`company:${u.companyId}`);
     }

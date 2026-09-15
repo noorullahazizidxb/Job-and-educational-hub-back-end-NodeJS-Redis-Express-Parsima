@@ -2,7 +2,15 @@
 
 `docker-compose.yml` in this repo uses network `app_net` and publishes app ports for local development.
 
-## Production
+Hosting runbooks (Vercel, Docker, Ubuntu) and deploy scripts:
+
+- [docs/README.md](docs/README.md)
+- [docs/vercel-deployment.md](docs/vercel-deployment.md)
+- `bash scripts/deploy-vercel.sh` / `bash scripts/docker-up.sh`
+
+## Production (this VPS / DevMinds)
+
+Use **DevMinds platform**:
 
 Use **DevMinds platform**:
 

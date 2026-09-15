@@ -1,51 +1,40 @@
 import fs from 'fs';
 import path from 'path';
-import { createQueue } from '../lib/queue.js';
+import os from 'os';
 import multer from 'multer';
+import { createQueue } from '../lib/queue.js';
+import { blobEnabled, isVercel, queueEnabled } from '../lib/runtime.js';
 
-const uploadDir = path.resolve(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const uploadRoot = isVercel
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.resolve(process.cwd(), 'uploads');
+
+if (!blobEnabled) {
+  for (const dir of [uploadRoot, path.join(uploadRoot, 'services'), path.join(uploadRoot, 'profile')]) {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+  if (isVercel) {
+    console.warn('HOSTING_PLATFORM=vercel without BLOB_READ_WRITE_TOKEN: uploads go to /tmp and will not persist');
+  }
 }
 
-// ensure services subfolder exists
-const serviceUploadDir = path.resolve(uploadDir, 'services');
-if (!fs.existsSync(serviceUploadDir)) {
-  fs.mkdirSync(serviceUploadDir, { recursive: true });
+function safeName(original) {
+  const safeOriginal = String(original || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `${Date.now()}_${safeOriginal}`;
 }
 
-// ensure profile subfolder exists
-const profileUploadDir = path.resolve(uploadDir, 'profile');
-if (!fs.existsSync(profileUploadDir)) {
-  fs.mkdirSync(profileUploadDir, { recursive: true });
+function diskStorage(subdir = '') {
+  const dest = subdir ? path.join(uploadRoot, subdir) : uploadRoot;
+  return multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, dest),
+    filename: (_req, file, cb) => cb(null, safeName(file.originalname)),
+  });
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const ts = Date.now();
-    cb(null, `${ts}_${safeOriginal}`);
-  },
-});
-
-const serviceStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, serviceUploadDir),
-  filename: (_req, file, cb) => {
-    const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const ts = Date.now();
-    cb(null, `${ts}_${safeOriginal}`);
-  },
-});
-
-const profileStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, profileUploadDir),
-  filename: (_req, file, cb) => {
-    const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const ts = Date.now();
-    cb(null, `${ts}_${safeOriginal}`);
-  },
-});
+const memoryStorage = multer.memoryStorage();
+const storageBackend = blobEnabled ? memoryStorage : diskStorage();
+const serviceStorage = blobEnabled ? memoryStorage : diskStorage('services');
+const profileStorage = blobEnabled ? memoryStorage : diskStorage('profile');
 
 const allowed = new Set([
   'application/pdf',
@@ -59,31 +48,94 @@ function fileFilter(_req, file, cb) {
   cb(new Error('Invalid file type'));
 }
 
-const DEFAULT_FILE_LIMIT = Number(process.env.FILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024; // 5MB default
-const DEFAULT_SERVICE_LIMIT = Number(process.env.SERVICE_UPLOAD_LIMIT_BYTES) || 10 * 1024 * 1024; // 10MB default
+const DEFAULT_FILE_LIMIT = Number(process.env.FILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024;
+const DEFAULT_SERVICE_LIMIT = Number(process.env.SERVICE_UPLOAD_LIMIT_BYTES) || 10 * 1024 * 1024;
 
-export const upload = multer({ storage, fileFilter, limits: { fileSize: DEFAULT_FILE_LIMIT } });
-export const uploadService = multer({ storage: serviceStorage, fileFilter, limits: { fileSize: DEFAULT_SERVICE_LIMIT } });
-export const uploadProfile = multer({
+function collectFiles(req) {
+  const out = [];
+  if (req.file) out.push(req.file);
+  if (Array.isArray(req.files)) out.push(...req.files);
+  else if (req.files && typeof req.files === 'object') {
+    for (const value of Object.values(req.files)) {
+      if (Array.isArray(value)) out.push(...value);
+      else if (value) out.push(value);
+    }
+  }
+  return out;
+}
+
+async function persistToBlob(file, folder) {
+  const { put } = await import('@vercel/blob');
+  const filename = file.filename || safeName(file.originalname);
+  const blob = await put(`${folder}/${filename}`, file.buffer, {
+    access: 'public',
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    addRandomSuffix: false,
+  });
+  file.filename = filename;
+  file.blobUrl = blob.url;
+}
+
+function persistMiddleware(folder) {
+  return async (req, _res, next) => {
+    if (!blobEnabled) return next();
+    try {
+      for (const file of collectFiles(req)) {
+        if (file?.buffer) await persistToBlob(file, folder);
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+function wrapMulter(instance, folder) {
+  const run = (mw) => (req, res, next) => {
+    mw(req, res, (err) => {
+      if (err) return next(err);
+      return persistMiddleware(folder)(req, res, next);
+    });
+  };
+  return {
+    single: (field) => run(instance.single(field)),
+    array: (field, max) => run(instance.array(field, max)),
+    fields: (fields) => run(instance.fields(fields)),
+    none: () => run(instance.none()),
+    any: () => run(instance.any()),
+  };
+}
+
+const uploadRaw = multer({ storage: storageBackend, fileFilter, limits: { fileSize: DEFAULT_FILE_LIMIT } });
+const uploadServiceRaw = multer({ storage: serviceStorage, fileFilter, limits: { fileSize: DEFAULT_SERVICE_LIMIT } });
+const uploadProfileRaw = multer({
   storage: profileStorage,
   fileFilter: (_req, file, cb) => {
-    // Accept common image mime types including some vendor variants
     const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
     if (allowedImageTypes.has(file.mimetype)) return cb(null, true);
     cb(new Error('Invalid image type'));
   },
-  limits: { fileSize: Number(process.env.PROFILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024 }, // Limit to 5MB
+  limits: { fileSize: Number(process.env.PROFILE_UPLOAD_LIMIT_BYTES) || 5 * 1024 * 1024 },
 });
 
-// If a profile upload route wants to enqueue optimization, they can call this helper.
+export const upload = wrapMulter(uploadRaw, 'uploads');
+export const uploadService = wrapMulter(uploadServiceRaw, 'uploads/services');
+export const uploadProfile = wrapMulter(uploadProfileRaw, 'uploads/profile');
+
+export function publicFileUrl(file, prefix = '/uploads') {
+  if (!file) return null;
+  if (file.blobUrl) return file.blobUrl;
+  const base = String(prefix || '/uploads').replace(/\/$/, '');
+  return `${base}/${file.filename}`;
+}
+
 export function enqueueProfileOptimization(req, file) {
   try {
-    // create queue lazily
+    if (!queueEnabled || !file?.filename) return;
     const q = createQueue('image-processor');
     const filePath = `/uploads/profile/${file.filename}`;
     q.add('optimize', { filePath, mime: file.mimetype });
   } catch (e) {
-    // ignore queue errors — upload should not fail because optimization is unavailable
     console.error('enqueueProfileOptimization error', e?.message || e);
   }
 }

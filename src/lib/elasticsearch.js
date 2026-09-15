@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import logger from '../utils/logger.js';
+import { searchEnabled as runtimeSearchEnabled } from './runtime.js';
 
 let clientInstance = null;
 
 export function isSearchEnabled() {
-  return Boolean(process.env.ELASTICSEARCH_URL);
+  return runtimeSearchEnabled;
 }
 
 export async function getEsClient() {
@@ -15,11 +16,8 @@ export async function getEsClient() {
   const auth = ELASTICSEARCH_API_KEY
     ? { apiKey: ELASTICSEARCH_API_KEY }
     : (ELASTICSEARCH_USERNAME || ELASTICSEARCH_PASSWORD
-        ? { username: ELASTICSEARCH_USERNAME, password: ELASTICSEARCH_PASSWORD }
-        : undefined);
-  // Some servers (Elasticsearch 8.x, OpenSearch 2.x) require compatibility headers
-  // and will reject the default "compatible-with=9" from the v9 JS client.
-  // Allow overriding via ES_COMPATIBILITY env ("8" or "7"). Default to 8.
+      ? { username: ELASTICSEARCH_USERNAME, password: ELASTICSEARCH_PASSWORD }
+      : undefined);
   const compat = (ES_COMPATIBILITY === '7' || ES_COMPATIBILITY === '8') ? ES_COMPATIBILITY : '8';
   const headers = {
     accept: `application/vnd.elasticsearch+json; compatible-with=${compat}`,
@@ -39,5 +37,5 @@ export async function refreshIndices(indices) {
   const client = await getEsClient();
   if (!client) return;
   const idx = Array.isArray(indices) ? indices.join(',') : indices;
-  try { await client.indices.refresh({ index: idx }); } catch (e) { /* ignore */ }
+  try { await client.indices.refresh({ index: idx }); } catch { /* ignore */ }
 }

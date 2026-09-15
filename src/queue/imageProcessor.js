@@ -78,9 +78,17 @@ async function processor(job) {
   }
 }
 
+function noopDisabledWorker() {
+  return { on() {}, close: async () => {} };
+}
+
 let workerInstance = null;
 export function startWorker(options = {}) {
   if (workerInstance) return workerInstance;
+  if (process.env.HOSTING_PLATFORM === 'vercel' || process.env.VERCEL) {
+    console.log('image-processor worker skipped on Vercel');
+    return noopDisabledWorker();
+  }
   const w = createWorker('image-processor', async (job) => processor(job), options);
   w.on('failed', (job, err) => {
     console.error('image-processor job failed', job.id, err?.message || err);
