@@ -1,0 +1,16 @@
+---
+description: Jobs API architecture, env switches, and where each feature lives
+alwaysApply: true
+---
+
+# Jobs API
+
+Express + Prisma. Customer app: `jobAndEducation-Hub-Next-JS-Final_Branch`. Public API base: `https://jobs.devminds.net/backend`.
+
+- Routes: `src/routes/*.js`. Logic: `src/services/*.controller.js`. Validation: `src/validation/*.schema.js`.
+- One Prisma client from `src/lib/prisma.js`. Hosting flags from `src/lib/runtime.js`.
+- `DB_PROVIDER` selects mysql, postgresql, or sqlite in `prisma.config.ts`.
+- `HOSTING_PLATFORM=vercel` forces Redis, Elasticsearch, Socket.IO, and BullMQ off. VPS uses `HOSTING_PLATFORM=local` and the same variables. Do not hardcode hosts.
+- Vercel Hobby `maxDuration` is 10 seconds (`vercel.json`, `api/index.js`). Raise it only on a paid Vercel plan.
+- Feature diagrams: `docs/features/`. Deploy: `docs/vercel-deployment.md`, `docs/ubuntu.md`, `docs/docker.md`. Agent index: `AGENTS.md`.
+- There is no `.codegraph/` index until someone runs `codegraph init`. Do not invent graph relationships.

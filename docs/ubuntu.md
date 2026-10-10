@@ -2,6 +2,8 @@
 
 Use a VPS (Ubuntu 22.04 / 24.04) when you want a long-running Node process: Socket.IO, Redis, uploads on disk, and optional Elasticsearch.
 
+The free production path is Vercel plus Neon. See [vercel-deployment.md](vercel-deployment.md). Use this chapter when you outgrow Hobby limits. Point DNS back from the Vercel CNAME to this server only after nginx and TLS work. While Vercel owns `jobs.devminds.net`, do not also publish an A record to the VPS for the same name.
+
 Customer Next.js can run on the **same** machine (PM2 + nginx) or stay on Vercel with `NEXT_PUBLIC_API_BASE` pointing at this API.
 
 ## 1. Bootstrap

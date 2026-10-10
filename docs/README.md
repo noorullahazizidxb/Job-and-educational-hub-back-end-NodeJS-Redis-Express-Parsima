@@ -10,6 +10,8 @@ This backend (Express + Prisma) and the customer Next.js app can be hosted in th
 
 Scripts live in [`../scripts`](../scripts).
 
-- Domain: `https://jobs.devminds.net`
+- Domain: `https://jobs.devminds.net` (Hostinger CNAME `jobs` → `cname.vercel-dns.com` for the free Vercel path)
+- Frontend repo: `jobAndEducation-Hub-Next-JS-Final_Branch`
 - Backend on Vercel is reached at `https://jobs.devminds.net/backend` (Next.js rewrite)
 - Backend on Docker/Ubuntu is usually `http://SERVER:4001` or a reverse-proxied path
+- Feature diagrams: [features/README.md](features/README.md)

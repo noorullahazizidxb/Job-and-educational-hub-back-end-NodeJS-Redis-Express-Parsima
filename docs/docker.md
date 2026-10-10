@@ -25,7 +25,7 @@ cp .env.compose.example .env.compose
 Set at least:
 
 ```bash
-FRONTEND_PATH=/absolute/path/to/jobAndEducation-Hub-Next-JS
+FRONTEND_PATH=/absolute/path/to/jobAndEducation-Hub-Next-JS-Final_Branch
 MYSQL_ROOT_PASSWORD=change-me
 REDIS_PASSWORD=change-me
 ES_PASSWORD=change-me
@@ -35,7 +35,7 @@ NEXT_PUBLIC_RECAPTCHA_SITE_KEY=
 DB_PROVIDER=mysql
 ```
 
-On Windows Docker Desktop, `FRONTEND_PATH` can be `C:/Jobs-Apps/jobAndEducation-Hub-Next-JS`.
+On Windows Docker Desktop, `FRONTEND_PATH` can be `C:/Jobs-Apps/jobAndEducation-Hub-Next-JS-Final_Branch`.
 
 Then:
 

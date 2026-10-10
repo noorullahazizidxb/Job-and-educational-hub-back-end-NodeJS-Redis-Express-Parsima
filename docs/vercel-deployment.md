@@ -1,132 +1,115 @@
-# Overall Vercel deployment — Jobs API + customer Next.js
+# Free Vercel — Jobs API + customer Next.js
 
-Two Vercel projects, one public domain: **`https://jobs.devminds.net`**.
+Two Vercel projects. One public domain: `https://jobs.devminds.net`.
 
-Vercel is serverless. Redis, Elasticsearch, Socket.IO, and BullMQ workers **cannot** stay always-on. Set `HOSTING_PLATFORM=vercel` on the API so those extras are forced off. You still need a **hosted SQL database** (Neon Postgres hobby is free). A SQLite file on Vercel will not persist.
+Vercel is serverless. Redis, Elasticsearch, Socket.IO, and BullMQ cannot stay always-on. `HOSTING_PLATFORM=vercel` forces them off. The database is Neon Postgres on the free plan (`free_v3`). SQLite will not persist.
+
+Hobby functions are capped at 10 seconds (`maxDuration` in `vercel.json` and `api/index.js`). A paid Vercel plan is what lets you raise that number.
 
 ```text
-Browser  →  jobs.devminds.net          (Next.js project + custom domain)
-                │
-                ├── /                  pages, assets
-                ├── /api/*             Next.js route handlers
-                └── /backend/*  ──rewrite──►  <api>.vercel.app   (Express project)
-                                                    │
-                                                    └── Neon Postgres (DATABASE_URL)
+Browser → jobs.devminds.net          (Next.js project + custom domain)
+              ├── /                  pages
+              └── /backend/*  rewrite →  jobs-hub-api.vercel.app
+                                              └── Neon Postgres
 ```
 
-## Local Vercel-like test (this PC)
+Frontend repo: `jobAndEducation-Hub-Next-JS-Final_Branch`.
+API project name: `jobs-hub-api`.
 
-Does **not** need a Vercel login. Uses SQLite and the same flags as production (`HOSTING_PLATFORM=vercel`, Socket.IO off, `/backend` rewrite).
+## 1. Accounts
+
+- Vercel CLI already used by `npx vercel login`
+- Neon through the Vercel marketplace (free plan). Accept terms once: `vercel integration accept-terms neon` or the URL the CLI prints
+- Domain DNS at Hostinger for `devminds.net`
+
+## 2. Database
+
+From this repo, after `npx vercel link --yes --project jobs-hub-api`:
 
 ```bash
-# from the backend repo — stop any existing :3000 / :4000 first
-npm run dev:vercel
+npx vercel integration add neon --name jobs-hub-db --plan free_v3 -m region=fra1 -m auth=false --no-env-pull
 ```
 
-- Site: http://localhost:3000
-- API through rewrite: http://localhost:3000/backend/health (`hostingPlatform: "vercel"`)
-- Env files: `.env.vercel.local` in each repo (frontend also writes `.env.local` for Next)
+`auth=false` keeps Neon Auth off. This API uses its own JWT.
 
-For the real serverless emulator (needs `npx vercel login`): `npx vercel dev` in each repo.
+Pull the URL into a gitignored file (do not overwrite local `.env`):
 
----
+```bash
+npx vercel env pull .env.vercel.production --environment production --yes
+```
 
-## 1. Prerequisites
-
-- [Vercel account](https://vercel.com) and [Vercel CLI](https://vercel.com/docs/cli): `npm i -g vercel`
-- [Neon](https://neon.tech) (or any Postgres) connection string
-- Domain `jobs.devminds.net` DNS you can edit
-- This backend repo and the customer app: `jobAndEducation-Hub-Next-JS`
-
-## 2. Database (once)
-
-1. Create a Neon project.
-2. Copy the pooled connection string.
-3. From this backend repo (after `npm install`):
+Migrate with the **unpooled** URL when Neon provides one (`DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING`). Runtime on Vercel should use the pooled URL.
 
 ```bash
 export DB_PROVIDER=postgresql
-export DATABASE_URL='postgresql://USER:PASSWORD@HOST/dbname?sslmode=require'
+export DATABASE_URL='postgresql://...unpooled...?sslmode=require'
 npx prisma generate
 npx prisma migrate deploy
-# optional:
 npx prisma db seed
 ```
 
-Or: `bash scripts/prisma-migrate.sh`
+## 3. API env
 
-## 3. Deploy the backend (this repo)
+Paste the rest from `.env.vercel.example` into the `jobs-hub-api` project. Required:
+
+- `HOSTING_PLATFORM=vercel`
+- `DB_PROVIDER=postgresql`
+- `DATABASE_URL` pooled Neon URL (the integration sets this)
+- `JWT_SECRET` and `CRON_SECRET` long random strings
+- `CORS_ORIGIN=https://jobs.devminds.net`
+- `REDIS_ENABLED=false` `SEARCH_ENABLED=false` `SOCKET_IO_ENABLED=false`
+
+Leave `REDIS_URL`, `ELASTICSEARCH_URL`, and `BLOB_READ_WRITE_TOKEN` empty until you pay for them or move to a VPS.
 
 ```bash
-cd Job-and-educational-hub-back-end-NodeJS-Redis-Express-Parsima-main
 bash scripts/deploy-vercel.sh
 ```
 
-The script links the project (first run) and deploys to production.
+Build runs `prisma generate`. Copy the `https://jobs-hub-api-....vercel.app` URL.
 
-In the Vercel dashboard → **Settings → Environment Variables**, paste values from [`.env.vercel.example`](../.env.vercel.example):
+## 4. Frontend
 
-| Variable | Value |
-| --- | --- |
-| `HOSTING_PLATFORM` | `vercel` |
-| `DB_PROVIDER` | `postgresql` |
-| `DATABASE_URL` | Neon URL |
-| `JWT_SECRET` | long random string |
-| `CORS_ORIGIN` | `https://jobs.devminds.net` |
-| `CRON_SECRET` | random string (Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`) |
-| `BLOB_READ_WRITE_TOKEN` | optional, for persistent uploads |
+In `jobAndEducation-Hub-Next-JS-Final_Branch`, set `.env.vercel.example` values on that Vercel project:
 
-Build command: `npm run build` (runs `prisma generate`). Entry: `api/index.js` via [`vercel.json`](../vercel.json). Daily cleanup: cron `GET /api/maintenance/cleanup-expired`.
+- `NEXT_PUBLIC_SITE_URL=https://jobs.devminds.net`
+- `NEXT_PUBLIC_API_BASE=https://jobs.devminds.net/backend`
+- `NEXT_PUBLIC_API_HOST=https://jobs.devminds.net`
+- `BACKEND_VERCEL_URL` = the API URL, no trailing slash
+- `NEXT_PUBLIC_SOCKET_IO_ENABLED=false`
 
-Copy the backend URL, e.g. `https://job-portal-api-xxxx.vercel.app`.
-
-## 4. Deploy the customer Next.js app
+`NEXT_PUBLIC_*` and `BACKEND_VERCEL_URL` are build-time. Redeploy after changing them.
 
 ```bash
-cd jobAndEducation-Hub-Next-JS
 bash scripts/deploy-vercel.sh
 ```
 
-Set env vars from that repo’s `.env.vercel.example`:
+## 5. Domain and Hostinger
 
-| Variable | Value |
-| --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | `https://jobs.devminds.net` |
-| `NEXT_PUBLIC_API_BASE` | `https://jobs.devminds.net/backend` |
-| `NEXT_PUBLIC_API_HOST` | `https://jobs.devminds.net` |
-| `BACKEND_VERCEL_URL` | `https://<backend>.vercel.app` (no trailing slash) |
-| `NEXT_PUBLIC_SOCKET_IO_ENABLED` | `false` |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | optional |
+Attach `jobs.devminds.net` only to the **frontend** project.
 
-`NEXT_PUBLIC_*` and `BACKEND_VERCEL_URL` are **build-time**. Redeploy after changing them.
+In Hostinger DNS for `devminds.net`:
 
-## 5. Attach the domain
+1. Delete the A record whose name is `jobs` and whose value is `188.245.221.222`.
+2. Add a CNAME: name `jobs`, target `cname.vercel-dns.com` (use the exact target Vercel shows if it differs).
 
-On the **frontend** Vercel project:
+Do not also attach this hostname to `jobs-hub-api`. The Next.js rewrite `/backend/:path*` proxies to `BACKEND_VERCEL_URL`.
 
-1. Settings → Domains → add `jobs.devminds.net` (and `www` if you use it).
-2. At your DNS host, add the CNAME Vercel shows (usually `jobs` → `cname.vercel-dns.com`).
-3. Do **not** also attach this domain to the backend project. The frontend rewrite `/backend/:path*` proxies to `BACKEND_VERCEL_URL`.
+## 6. Check
 
-## 6. Verify
+- `https://jobs.devminds.net`
+- `https://jobs.devminds.net/backend/health` → `ok: true`, `db: ok`, `runtime.hostingPlatform: vercel`
 
-- Site: `https://jobs.devminds.net`
-- API health: `https://jobs.devminds.net/backend/health` → `{ "ok": true, "db": "ok", "runtime": { "hostingPlatform": "vercel", ... } }`
-- Login uses JWT against `/backend/api/auth/login`
+## What free Vercel does not do
 
-## What Vercel mode does not do
+- Live inbox over Socket.IO (HTTP inbox still works)
+- Shared Redis rate limits and metric counters
+- Elasticsearch (Prisma text filters still run)
+- Durable `uploads/` unless `BLOB_READ_WRITE_TOKEN` is set
 
-- Live inbox over Socket.IO (REST/SWR still works)
-- Redis-backed report charts and shared rate limits
-- Elasticsearch suggestions (Prisma text search fallback)
-- Persistent local `uploads/` unless `BLOB_READ_WRITE_TOKEN` is set
+## Switch to paid or a VPS later
 
-## Re-deploy later
+Change variables, do not fork code.
 
-```bash
-# backend
-bash scripts/deploy-vercel.sh
-
-# frontend (after env or code changes)
-bash scripts/deploy-vercel.sh
-```
+- VPS: `HOSTING_PLATFORM=local`, plus `REDIS_URL`, `ELASTICSEARCH_URL`, `SOCKET_IO_ENABLED=true`. See [ubuntu.md](ubuntu.md).
+- Longer functions: paid Vercel plan, then set `maxDuration` above 10.
+- Neon Launch/Scale: `vercel integration update` or `--plan launch_v3` on a new resource. Point `DATABASE_URL` at the new pooled string.

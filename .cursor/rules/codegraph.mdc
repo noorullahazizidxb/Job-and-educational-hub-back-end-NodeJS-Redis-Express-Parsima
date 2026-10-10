@@ -1,0 +1,20 @@
+---
+description: Use CodeGraph only after this repo is indexed
+alwaysApply: true
+---
+
+# CodeGraph
+
+This repository does not include a `.codegraph/` index. Do not read, grep, or edit that folder if it appears later. It is a database.
+
+Until `codegraph init` has been run in this repo:
+
+- Explore with normal search and file reads.
+- Diagrams in `docs/features/` are Mermaid drawn from the source files named in each doc, not from a graph query.
+
+After an index exists:
+
+- Query it through the CodeGraph MCP tool `codegraph_explore` (pass `projectPath`).
+- Before editing a shared helper, ask the graph who calls it.
+- If the tool errors, say so and fall back to search.
+- Do not guess module links. Say what the graph returned and what is still unread.
