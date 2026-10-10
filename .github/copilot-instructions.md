@@ -3,6 +3,18 @@
 Short, actionable guidance for AI coding agents working on the Job Portal backend.
 Focus on the runtime wiring, common patterns, where to make changes, and how to run the project locally.
 
+# CodeGraph rules (mandatory)
+
+This project has a CodeGraph index (`.codegraph/`), exposed through the `codegraph` MCP server. Do not read or edit the `.codegraph/` folder directly. Use the tools.
+
+- Your first tool call for any code question or edit must be a CodeGraph tool: `codegraph_search` (symbol lookup), `codegraph_context` (feature or area, short keywords only), `codegraph_callers` / `codegraph_callees` (call flow).
+- Before changing shared code, run `codegraph_impact` and list affected callers.
+- Read only the files the graph points to. Avoid repo-wide grep or file scanning unless CodeGraph returns nothing.
+- If CodeGraph tools are unavailable, say so before falling back.
+- Diagrams must be Mermaid built only from CodeGraph results. Flag anything unconfirmed.
+- Do not guess module relationships.
+
+
 ## Quick start / dev commands
 
 - Copy `.env.example` -> `.env` and set `DATABASE_URL`, `REDIS_URL`, `ELASTICSEARCH_URL` (if used), and other secrets.

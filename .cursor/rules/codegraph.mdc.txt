@@ -1,0 +1,19 @@
+---
+description: Always use CodeGraph tools for code exploration
+alwaysApply: true
+---
+
+# CodeGraph rules (mandatory)
+
+This project has a CodeGraph index (`.codegraph/`). It is a database: never open, read, grep or edit it. Query it only through the MCP tools.
+
+Before answering any question about the code, or editing anything:
+1. Your first tool call must be a CodeGraph tool.
+   - Known symbol name: `codegraph_search`
+   - Feature, area or task: `codegraph_context` (short keywords only, no sentences)
+   - Who uses this: `codegraph_callers` / `codegraph_callees`
+2. Before changing shared code (signatures, types, services, utilities): run `codegraph_impact` and list the affected callers.
+3. Only read source files that the graph results point to. Do not scan the repo with grep or directory listings unless CodeGraph returns nothing.
+4. If a CodeGraph tool is unavailable or errors, say so clearly, then fall back to normal search.
+5. When asked for a diagram, output Mermaid built only from CodeGraph results, and list anything you could not confirm.
+6. Never guess relationships between modules. State what came from the graph and what is an assumption.
