@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { getJson, setJson } from '../lib/cache.js';
+import { isPostgres } from '../lib/sqlDialect.js';
 
 // Returns active jobs count, companies count, average time-to-hire (ms) for hired applications
 export async function overview(_req, res, next) {
@@ -17,9 +18,10 @@ export async function overview(_req, res, next) {
     const hiredCount = await prisma.jobApplication.count({ where: { status: 'hired' } }).catch(() => 0);
     try {
       // raw query returns driver-specific rows; alias columns to predictable names
-      const raw = await prisma.$queryRawUnsafe(
-        "SELECT COUNT(*) AS cnt, AVG(TIMESTAMPDIFF(MICROSECOND, createdAt, updatedAt))/1000 AS avg_ms FROM JobApplication WHERE status = 'hired' AND updatedAt > createdAt"
-      );
+      const avgSql = isPostgres()
+        ? `SELECT COUNT(*) AS cnt, AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) * 1000) AS avg_ms FROM "JobApplication" WHERE status = 'hired' AND "updatedAt" > "createdAt"`
+        : "SELECT COUNT(*) AS cnt, AVG(TIMESTAMPDIFF(MICROSECOND, createdAt, updatedAt))/1000 AS avg_ms FROM JobApplication WHERE status = 'hired' AND updatedAt > createdAt";
+      const raw = await prisma.$queryRawUnsafe(avgSql);
       let row = null;
       if (Array.isArray(raw) && raw.length) row = raw[0];
       else if (raw && typeof raw === 'object') row = raw;

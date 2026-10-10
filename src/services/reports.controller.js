@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { getJson, setJson } from '../lib/cache.js';
 import { getRedisSeries, buildLabels } from '../lib/metrics.js';
+import { isPostgres, quoteIdent, sincePlaceholder } from '../lib/sqlDialect.js';
 
 // Helper to get start timestamps
 function sinceHours(hours) {
@@ -37,10 +38,19 @@ const TABLES = {
 };
 
 // Group by DATE(createdAt) for a given model between since..now
+function createdAtColumn() {
+  return isPostgres() ? '"createdAt"' : 'createdAt';
+}
+
+function dayBucket() {
+  return isPostgres() ? '("createdAt")::date' : 'DATE(createdAt)';
+}
+
 async function groupCountByDate(modelName, since) {
-  const table = TABLES[modelName];
-  if (!table) return [];
-  const sql = `SELECT DATE(createdAt) AS d, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY DATE(createdAt) ORDER BY d`;
+  const table = quoteIdent(TABLES[modelName] || '');
+  if (!TABLES[modelName]) return [];
+  const day = dayBucket();
+  const sql = `SELECT ${day} AS d, COUNT(*) AS c FROM ${table} WHERE ${createdAtColumn()} >= ${sincePlaceholder()} GROUP BY ${day} ORDER BY d`;
   const rows = await prisma.$queryRawUnsafe(sql, since);
   return Array.isArray(rows)
     ? rows.map((r) => ({ date: String(Object.values(r)[0]), count: Number(Object.values(r)[1]) }))
@@ -49,10 +59,18 @@ async function groupCountByDate(modelName, since) {
 
 // Group counts by period label using MySQL functions
 async function groupCountByPeriod(modelName, period, since) {
-  const table = TABLES[modelName];
-  if (!table) return [];
+  if (!TABLES[modelName]) return [];
+  const table = quoteIdent(TABLES[modelName]);
+  const created = createdAtColumn();
+  const ph = sincePlaceholder();
   let sql;
-  if (period === 'daily') sql = `SELECT DATE(createdAt) AS b, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY DATE(createdAt) ORDER BY b`;
+  if (isPostgres()) {
+    if (period === 'daily') sql = `SELECT ${dayBucket()} AS b, COUNT(*) AS c FROM ${table} WHERE ${created} >= ${ph} GROUP BY 1 ORDER BY 1`;
+    else if (period === 'weekly') sql = `SELECT to_char(${created}, 'IYYY') || '-W' || to_char(${created}, 'IW') AS b, COUNT(*) AS c FROM ${table} WHERE ${created} >= ${ph} GROUP BY 1 ORDER BY 1`;
+    else if (period === 'monthly') sql = `SELECT to_char(${created}, 'YYYY-MM') AS b, COUNT(*) AS c FROM ${table} WHERE ${created} >= ${ph} GROUP BY 1 ORDER BY 1`;
+    else if (period === 'yearly') sql = `SELECT to_char(${created}, 'YYYY') AS b, COUNT(*) AS c FROM ${table} WHERE ${created} >= ${ph} GROUP BY 1 ORDER BY 1`;
+    else return [];
+  } else if (period === 'daily') sql = `SELECT DATE(createdAt) AS b, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY DATE(createdAt) ORDER BY b`;
   else if (period === 'weekly') sql = `SELECT CONCAT(YEAR(createdAt), '-W', LPAD(WEEK(createdAt, 3), 2, '0')) AS b, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY YEAR(createdAt), WEEK(createdAt, 3) ORDER BY YEAR(createdAt), WEEK(createdAt, 3)`;
   else if (period === 'monthly') sql = `SELECT DATE_FORMAT(createdAt, '%Y-%m') AS b, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY DATE_FORMAT(createdAt, '%Y-%m') ORDER BY b`;
   else if (period === 'yearly') sql = `SELECT CAST(YEAR(createdAt) AS CHAR) AS b, COUNT(*) AS c FROM ${table} WHERE createdAt >= ? GROUP BY YEAR(createdAt) ORDER BY YEAR(createdAt)`;
@@ -83,10 +101,10 @@ export async function overview(_req, res, next) {
       ]);
 
       // Distinct users who applied to jobs in this period (proxy for "visited users")
-      const distinctApplicantsRows = await prisma.$queryRawUnsafe(
-        'SELECT COUNT(DISTINCT userId) AS cnt FROM JobApplication WHERE createdAt >= ?',
-        since,
-      ).catch(() => [{ cnt: 0 }]);
+      const distinctSql = isPostgres()
+        ? 'SELECT COUNT(DISTINCT "userId") AS cnt FROM "JobApplication" WHERE "createdAt" >= $1'
+        : 'SELECT COUNT(DISTINCT userId) AS cnt FROM JobApplication WHERE createdAt >= ?';
+      const distinctApplicantsRows = await prisma.$queryRawUnsafe(distinctSql, since).catch(() => [{ cnt: 0 }]);
       const visitedUsers = Number(
         Array.isArray(distinctApplicantsRows) && distinctApplicantsRows[0] && distinctApplicantsRows[0].cnt != null
           ? distinctApplicantsRows[0].cnt

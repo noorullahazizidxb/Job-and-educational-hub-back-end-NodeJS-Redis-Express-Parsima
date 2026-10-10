@@ -12,4 +12,4 @@ flowchart LR
   controller --> prisma[Prisma Contact]
 ```
 
-The public site form is `src/components/sections/contact-form.client.tsx` in the Next.js app. Listing and delete are for staff screens.
+The public site form is `src/components/sections/contact-form.client.tsx` in the Next.js app. `src/routes/contacts.js` does not attach `requireAdmin` to list or delete. Treat that as a gap if those screens are staff-only.
