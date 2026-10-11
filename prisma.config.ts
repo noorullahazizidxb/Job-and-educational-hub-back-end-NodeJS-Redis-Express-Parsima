@@ -6,6 +6,7 @@ import { defineConfig } from "prisma/config";
  *
  * DB_PROVIDER selects the schema and migration folder:
  *   sqlite      → prisma/sqlite/schema.prisma + SQLITE_URL
+ *   turso       → prisma/sqlite/schema.prisma + TURSO_DATABASE_URL (migrate uses SQLITE_URL)
  *   postgresql  → prisma/postgres/schema.prisma + DATABASE_URL
  *   mysql       → prisma/mysql/schema.prisma + DATABASE_URL (default)
  *
@@ -54,7 +55,8 @@ const productionEnv = readEnvFile(".env.production");
 const localProvider = (localEnv.DB_PROVIDER || "").toLowerCase();
 const provider = (process.env.DB_PROVIDER || localProvider || productionEnv.DB_PROVIDER || "mysql")
   .toLowerCase();
-const useSQLite = provider === "sqlite";
+const useTurso = provider === "turso";
+const useSQLite = provider === "sqlite" || useTurso;
 const usePostgres = provider === "postgresql" || provider === "postgres";
 const localIsPostgres = localProvider === "postgresql" || localProvider === "postgres";
 

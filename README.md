@@ -5,7 +5,7 @@ Express + Prisma API for the Jobs hub (`jobs.devminds.net`). The customer app is
 ## Local
 
 ```bash
-cp .env.example .env
+cp env-examples/vps.env.example .env
 npm install
 npm run generate
 npm run migrate
@@ -19,6 +19,9 @@ API: http://localhost:4000 — health: `GET /health`.
 - `mysql` (default) — `prisma/mysql/schema.prisma`
 - `postgresql` — `prisma/postgres/schema.prisma` (Neon on Vercel)
 - `sqlite` — `prisma/sqlite/schema.prisma`
+- `turso` — same SQLite schema, runtime adapter `@prisma/adapter-libsql`
+
+Hosting profiles live in `env-examples/`.
 
 ## Free Vercel vs a VPS
 

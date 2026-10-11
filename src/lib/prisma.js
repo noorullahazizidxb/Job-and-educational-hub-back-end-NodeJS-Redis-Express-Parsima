@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import logger from '../utils/logger.js';
 
 function databaseProvider() {
@@ -14,6 +15,17 @@ function databaseProvider() {
  */
 export function createPrismaAdapter() {
 	const provider = databaseProvider();
+	if (provider === 'turso') {
+		const url = process.env.TURSO_DATABASE_URL;
+		if (!url) {
+			throw new Error('TURSO_DATABASE_URL is required when DB_PROVIDER is turso');
+		}
+		return new PrismaLibSql({
+			url,
+			authToken: process.env.TURSO_AUTH_TOKEN,
+		});
+	}
+
 	if (provider === 'sqlite') {
 		return new PrismaBetterSqlite3({
 			url: process.env.SQLITE_URL || 'file:./dev.db',
