@@ -4,14 +4,18 @@
 const SITEVERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 const DEFAULT_MIN_SCORE = 0.5;
 
+function isGoogleRecaptchaSecret(secret) {
+  return typeof secret === 'string' && secret.startsWith('6L');
+}
+
 export async function verifyRecaptchaToken(token, {
   secret = process.env.RECAPTCHA_SECRET_KEY,
   minScore = Number(process.env.RECAPTCHA_MIN_SCORE || DEFAULT_MIN_SCORE),
   expectedAction,
   remoteip,
 } = {}) {
-  if (!secret) {
-    console.warn('[recaptcha] RECAPTCHA_SECRET_KEY unset — skipping verify');
+  if (!isGoogleRecaptchaSecret(secret)) {
+    console.warn('[recaptcha] RECAPTCHA_SECRET_KEY is not a Google key — skipping verify');
     return { success: true, score: 1, action: expectedAction || 'skip', skipped: true };
   }
 
