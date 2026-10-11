@@ -11,12 +11,7 @@ export async function verifyRecaptchaToken(token, {
   remoteip,
 } = {}) {
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      const err = new Error('reCAPTCHA is not configured');
-      err.status = 503;
-      throw err;
-    }
-    console.warn('[recaptcha] RECAPTCHA_SECRET_KEY unset — skipping verify (non-production)');
+    console.warn('[recaptcha] RECAPTCHA_SECRET_KEY unset — skipping verify');
     return { success: true, score: 1, action: expectedAction || 'skip', skipped: true };
   }
 

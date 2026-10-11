@@ -12,7 +12,12 @@ const loginSchema = Joi.object({
   recaptchaToken: Joi.string().allow('', null).optional(),
 });
 
+const googleSchema = Joi.object({
+  idToken: Joi.string().min(20).required(),
+});
+
 router.post('/login', loginRateLimitMiddleware, validate(loginSchema), AuthController.login);
+router.post('/google', validate(googleSchema), AuthController.loginWithGoogle);
 router.get('/me', AuthController.me);
 
 export default router;

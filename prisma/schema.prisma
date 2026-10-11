@@ -233,6 +233,7 @@ enum UserRole {
 model User {
   id                 Int       @id @default(autoincrement())
   email              String    @unique
+  googleSub          String?   @unique
   passwordHash       String
   name               String?
   role               UserRole  @default(common)
