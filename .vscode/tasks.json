@@ -4,7 +4,7 @@
 		{
 			"label": "migrate-sqlite",
 			"type": "shell",
-			"command": "DB_PROVIDER=sqlite npx prisma migrate dev --name init_sqlite --schema prisma/schema.sqlite.prisma && DB_PROVIDER=sqlite node prisma/seed.js",
+			"command": "DB_PROVIDER=sqlite npx prisma migrate dev --name init_sqlite --schema prisma/sqlite/schema.prisma && DB_PROVIDER=sqlite node prisma/seed.js",
 			"isBackground": false
 		},
 		{
@@ -22,7 +22,7 @@
 		{
 			"label": "migrate-sqlite-v2",
 			"type": "shell",
-			"command": "DB_PROVIDER=sqlite SQLITE_URL=\"file:./dev.db\" npx prisma migrate dev --name init_sqlite --schema prisma/schema.sqlite.prisma 2>&1",
+			"command": "DB_PROVIDER=sqlite SQLITE_URL=\"file:./dev.db\" npx prisma migrate dev --name init_sqlite --schema prisma/sqlite/schema.prisma 2>&1",
 			"isBackground": false
 		},
 		{

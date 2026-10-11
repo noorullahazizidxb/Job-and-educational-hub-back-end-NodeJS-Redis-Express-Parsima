@@ -3,11 +3,10 @@ generator client {
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
-// Connection URL is configured in prisma.config.ts (Prisma v7).
-// Set DB_PROVIDER=sqlite and SQLITE_URL to use SQLite instead.
+// SQLite schema — used when DB_PROVIDER=sqlite.
+// Connection URL lives in prisma.config.ts. The client receives a driver adapter.
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
 }
 
 model Company {
@@ -17,7 +16,7 @@ model Company {
   website   String?
   logoUrl   String?
   industry  String?
-  size      String?   // e.g., 11-50, 51-200
+  size      String?
   about     String?
   description String
   address   String?
@@ -38,30 +37,30 @@ model Job {
   id          Int      @id @default(autoincrement())
   slug        String   @unique
   title       String
-  type        JobType
+  type        String   // JobType enum stored as string for SQLite
   location    String
   salaryMin   Int?
   salaryMax   Int?
-  currency    String? @default("USD")
+  currency    String?  @default("USD")
   description String
-  skills      String   // comma separated for simplicity
-  benefits    String?  // comma separated or plain text
-  applyUrl    String?  // alternatively email
+  skills      String
+  benefits    String?
+  applyUrl    String?
   applyEmail  String?
   contactEmail String?
   postedAt    DateTime @default(now())
   closingDate DateTime?
   vacancies   Int?     @default(1)
-  experience  ExperienceLevel?
-  education   EducationLevel?
-  gender      Gender?
-  orgType     OrganizationType?
-  status      JobStatus @default(published)
-  featured    Boolean   @default(false)
+  experience  String?  // ExperienceLevel
+  education   String?  // EducationLevel
+  gender      String?  // Gender
+  orgType     String?  // OrganizationType
+  status      String   @default("published") // JobStatus
+  featured    Boolean  @default(false)
   featuredUntil DateTime?
-  views       Int       @default(0)
+  views       Int      @default(0)
   cityId      Int?
-  city        City?     @relation(fields: [cityId], references: [id])
+  city        City?    @relation(fields: [cityId], references: [id])
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
@@ -75,50 +74,6 @@ model Job {
   @@index([companyId])
   @@index([cityId])
   @@index([postedAt])
-}
-
-enum JobType {
-  full_time
-  part_time
-  contract
-  internship
-  temporary
-  remote
-}
-
-enum JobStatus {
-  draft
-  published
-  closed
-}
-
-enum ExperienceLevel {
-  entry
-  mid
-  senior
-  lead
-}
-
-enum EducationLevel {
-  high_school
-  diploma
-  bachelor
-  master
-  doctorate
-}
-
-enum Gender {
-  any
-  male
-  female
-}
-
-enum OrganizationType {
-  private
-  government
-  ngo
-  international_org
-  other
 }
 
 model Category {
@@ -152,7 +107,7 @@ model City {
 model Advertisement {
   id        Int      @id @default(autoincrement())
   title     String
-  placement AdPlacement
+  placement String   // AdPlacement stored as string for SQLite
   imageUrl  String
   targetUrl String
   isActive  Boolean  @default(true)
@@ -165,45 +120,30 @@ model Advertisement {
   @@index([placement, isActive, startAt, endAt])
 }
 
-enum AdPlacement {
-  job_list_top
-  middle_of_job_list
-  home_page_after_pagenation_1
-  home_page_after_pagenation_2
-  middle_of_related_jobs_on_job_details
-  company_list_top
-  middle_of_company_list
-  middle_of_related_companies_on_company_details
-  service_list_top
-  middle_of_service_list
-  middle_of_related_services_on_service_details
-}
-
-// Services such as Procurement Opportunities and Scholarships
 model Service {
-  id           Int          @id @default(autoincrement())
-  type         ServiceType
+  id           Int      @id @default(autoincrement())
+  type         String   // ServiceType
   title        String
-  slug         String       @unique
-  description String
+  slug         String   @unique
+  description  String
   organization String?
   companyId    Int?
-  company      Company?     @relation(fields: [companyId], references: [id])
+  company      Company? @relation(fields: [companyId], references: [id])
   cityId       Int?
-  city         City?        @relation(fields: [cityId], references: [id])
-  country      String?      @default("Afghanistan")
+  city         City?    @relation(fields: [cityId], references: [id])
+  country      String?  @default("Afghanistan")
   category     String?
-  tags         String?      // comma separated
+  tags         String?
   eligibility  String?
-  documents    Json?
+  documents    String?  // JSON stored as TEXT in SQLite
   applyUrl     String?
   contactEmail String?
-  postedAt     DateTime     @default(now())
+  postedAt     DateTime @default(now())
   closingDate  DateTime?
-  status       ServiceStatus @default(published)
-  featured     Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  status       String   @default("published") // ServiceStatus
+  featured     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   applications ServiceApplication[]
 
   @@index([type, status, closingDate])
@@ -211,82 +151,57 @@ model Service {
   @@index([cityId])
 }
 
-enum ServiceType {
-  procurement
-  scholarship
-}
-
-enum ServiceStatus {
-  draft
-  published
-  closed
-}
-
-// Users & Roles
-enum UserRole {
-  common
-  company
-  admin
-  employee
-}
-
 model User {
-  id                 Int       @id @default(autoincrement())
-  email              String    @unique
-  googleSub          String?   @unique
+  id                 Int      @id @default(autoincrement())
+  email              String   @unique
+  googleSub          String?  @unique
   passwordHash       String
   name               String?
-  role               UserRole  @default(common)
+  role               String   @default("common") // UserRole
   companyId          Int?
-  company            Company?  @relation(fields: [companyId], references: [id])
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  company            Company? @relation(fields: [companyId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
   jobApplications    JobApplication[]
   serviceApplications ServiceApplication[]
   jobReviews         JobReview[]
   createdNotifications Notification[] @relation("NotificationCreatedBy")
   notificationRecipients NotificationRecipient[]
-  photo              String?   // Optional profile photo stored as /uploads/profile/<filename>
-  about              String?   // Optional 'about me' text
-  skills             String?   // Optional skills, comma separated
-  phone              String?   // Optional phone number
-  address            String?   // Optional address
+  photo              String?
+  about              String?
+  skills             String?
+  phone              String?
+  address            String?
+
   @@index([companyId])
 }
 
-// Notifications created by admins (or system) and recipients mapping
 model Notification {
-  id           Int       @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   title        String
   body         String?
-  link         String?    // optional url to open when user clicks the notification
-  createdById  Int?       // optional admin user who created the notification
-  createdBy    User?      @relation("NotificationCreatedBy", fields: [createdById], references: [id])
-  targetAll    Boolean    @default(false) // if true, intended for all users and companies
-  targetRole   UserRole?              // optional: target users with specific role (e.g., company, common)
-  sendAt       DateTime?              // scheduled send time, null => immediate
-  createdAt    DateTime   @default(now())
+  link         String?
+  createdById  Int?
+  createdBy    User?    @relation("NotificationCreatedBy", fields: [createdById], references: [id])
+  targetAll    Boolean  @default(false)
+  targetRole   String?  // UserRole
+  sendAt       DateTime?
+  createdAt    DateTime @default(now())
   recipients   NotificationRecipient[]
 
   @@index([createdById])
 }
 
-// Mapping table to store per-recipient delivery/read state. A recipient can be a User or a Company.
 model NotificationRecipient {
   id             Int          @id @default(autoincrement())
   notificationId Int
   notification   Notification @relation(fields: [notificationId], references: [id])
-
-  // recipient can be either a user or a company (one of these will be set)
   userId         Int?
   user           User?        @relation(fields: [userId], references: [id])
-
   companyId      Int?
   company        Company?     @relation(fields: [companyId], references: [id])
-
   isRead         Boolean      @default(false)
   readAt         DateTime?
-
   createdAt      DateTime     @default(now())
 
   @@index([notificationId])
@@ -296,61 +211,49 @@ model NotificationRecipient {
   @@unique([notificationId, companyId])
 }
 
-// Applications for Jobs
-enum ApplicationStatus {
-  applied
-  viewed
-  shortlisted
-  rejected
-  hired
-  withdrawn
-}
-
 model JobApplication {
-  id          Int               @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   jobId       Int
-  job         Job               @relation(fields: [jobId], references: [id])
+  job         Job      @relation(fields: [jobId], references: [id])
   userId      Int
-  user        User              @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
   fullName    String
   email       String
   cvUrl       String?
   coverLetter String?
-  answers     Json?
-  status      ApplicationStatus @default(applied)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  answers     String?  // JSON stored as TEXT in SQLite
+  status      String   @default("applied") // ApplicationStatus
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([jobId, userId])
   @@index([jobId, status])
   @@index([userId])
 }
 
-// Applications for Services (scholarships, procurements)
 model ServiceApplication {
-  id          Int               @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   serviceId   Int
-  service     Service           @relation(fields: [serviceId], references: [id])
+  service     Service  @relation(fields: [serviceId], references: [id])
   userId      Int
-  user        User              @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
   fullName    String
   email       String
   cvUrl       String?
   coverLetter String?
-  status      ApplicationStatus @default(applied)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  status      String   @default("applied") // ApplicationStatus
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([serviceId, userId])
   @@index([serviceId, status])
   @@index([userId])
 }
 
-// Flexible key/value site settings
 model Setting {
   key       String   @id
   value     String?
-  json      Json?
+  json      String?  // JSON stored as TEXT in SQLite
   updatedAt DateTime @updatedAt
 }
 
@@ -364,10 +267,10 @@ model JobReview {
   comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@index([jobId])
 }
 
-// Contact submissions from site visitors
 model Contact {
   id          Int      @id @default(autoincrement())
   firstName   String

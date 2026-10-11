@@ -1,28 +1,60 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import logger from '../utils/logger.js';
 
-// Create a single shared Prisma client instance and reuse it across the app.
-// This avoids opening many connections when your app handles many requests.
+function databaseProvider() {
+	return String(process.env.DB_PROVIDER || 'mysql').toLowerCase();
+}
+
+/**
+ * Prisma 7 does not read a URL from the schema. Migrate uses prisma.config.ts.
+ * Queries use the driver adapter for the active DB_PROVIDER.
+ */
+export function createPrismaAdapter() {
+	const provider = databaseProvider();
+	if (provider === 'sqlite') {
+		return new PrismaBetterSqlite3({
+			url: process.env.SQLITE_URL || 'file:./dev.db',
+		});
+	}
+
+	const connectionString = process.env.DATABASE_URL;
+	if (!connectionString) {
+		throw new Error(`DATABASE_URL is required when DB_PROVIDER is ${provider}`);
+	}
+
+	if (provider === 'postgresql' || provider === 'postgres') {
+		return new PrismaPg({
+			connectionString,
+			max: process.env.VERCEL ? 1 : 10,
+		});
+	}
+
+	return new PrismaMariaDb(connectionString);
+}
+
 const globalForPrisma = globalThis;
 
 const clientOptions = {
-	// Enable query logging in non-production to help with detecting slow queries.
-	log: ['warn', 'error', 'query'],
+	adapter: createPrismaAdapter(),
+	log: process.env.NODE_ENV === 'production' ? ['warn', 'error'] : ['warn', 'error', 'query'],
 };
 
 export const prisma = globalForPrisma.prisma || new PrismaClient(clientOptions);
 
-// In dev, keep a single instance across module reloads (hot reloads)
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Optional: emit a console warning for slow queries (threshold in ms)
 const SLOW_QUERY_MS = Number(process.env.PRISMA_SLOW_QUERY_MS || 200);
-try {
-	prisma.$on('query', (e) => {
+if (process.env.NODE_ENV !== 'production') {
+	try {
+		prisma.$on('query', (e) => {
 			if (e.duration > SLOW_QUERY_MS) {
 				logger.warn(`Prisma slow query (${e.duration}ms): ${e.query} -- params: ${JSON.stringify(e.params)}`);
 			}
-	});
-} catch (err) {
-	// Some Prisma runtime builds may not support $on in older versions; ignore safely.
+		});
+	} catch {
+		// Query events are optional when the driver adapter does not emit them.
+	}
 }

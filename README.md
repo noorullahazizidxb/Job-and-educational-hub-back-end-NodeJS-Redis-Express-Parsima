@@ -16,9 +16,9 @@ API: http://localhost:4000 — health: `GET /health`.
 
 `DB_PROVIDER` selects the schema:
 
-- `mysql` (default) — `prisma/schema.prisma`
-- `postgresql` — `prisma/schema.postgres.prisma` (Neon on Vercel)
-- `sqlite` — `prisma/schema.sqlite.prisma`
+- `mysql` (default) — `prisma/mysql/schema.prisma`
+- `postgresql` — `prisma/postgres/schema.prisma` (Neon on Vercel)
+- `sqlite` — `prisma/sqlite/schema.prisma`
 
 ## Free Vercel vs a VPS
 

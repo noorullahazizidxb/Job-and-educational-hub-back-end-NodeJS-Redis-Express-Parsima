@@ -4,10 +4,9 @@ generator client {
 }
 
 // PostgreSQL schema — used when DB_PROVIDER=postgresql.
-// Connection URL is configured in prisma.config.ts.
+// Connection URLs live in prisma.config.ts. The client receives a driver adapter.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Company {

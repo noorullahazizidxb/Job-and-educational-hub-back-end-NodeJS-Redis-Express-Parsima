@@ -12,12 +12,12 @@
     "build": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "migrate:sqlite": "DB_PROVIDER=sqlite prisma migrate deploy",
-    "migrate:postgres": "DB_PROVIDER=postgresql prisma migrate deploy",
-    "migrate:reset:sqlite": "DB_PROVIDER=sqlite prisma migrate reset",
+    "migrate:sqlite": "node ./scripts/prisma-cli.mjs sqlite migrate deploy",
+    "migrate:postgres": "node ./scripts/prisma-cli.mjs postgresql migrate deploy",
+    "migrate:reset:sqlite": "node ./scripts/prisma-cli.mjs sqlite migrate reset",
     "generate": "prisma generate",
-    "generate:sqlite": "DB_PROVIDER=sqlite prisma generate",
-    "generate:postgres": "DB_PROVIDER=postgresql prisma generate",
+    "generate:sqlite": "node ./scripts/prisma-cli.mjs sqlite generate",
+    "generate:postgres": "node ./scripts/prisma-cli.mjs postgresql generate",
     "seed": "prisma db seed",
     "lint": "eslint .",
     "worker": "node ./src/queue/imageProcessor.js",
@@ -31,9 +31,13 @@
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.1.1",
-    "@prisma/client": "^6.19.0",
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^13.0.3",
     "bullmq": "^5.58.5",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -43,8 +47,10 @@
     "ioredis": "^5.3.2",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
+    "mariadb": "^3.5.4",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "pg": "^8.23.1",
     "rate-limiter-flexible": "^7.3.0",
     "sharp": "^0.32.5",
     "socket.io": "^4.7.5"
@@ -53,11 +59,12 @@
     "eslint": "^9.9.0",
     "eslint-config-prettier": "^10.1.0",
     "nodemon": "^3.1.7",
-    "prisma": "^6.19.0"
+    "prisma": "^7.10.0"
   },
   "allowScripts": {
-    "@prisma/client@6.19.3": true,
-    "@prisma/engines@6.19.3": true,
-    "prisma@6.19.3": true
+    "@prisma/client@7.10.0": true,
+    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.0": true,
+    "better-sqlite3@12.11.1": true
   }
 }

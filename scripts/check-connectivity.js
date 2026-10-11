@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import Redis from 'ioredis';
-import { PrismaClient } from '@prisma/client';
+import { prisma as sharedPrisma } from '../src/lib/prisma.js';
 
 // Optional elasticsearch client import guarded – only if URL provided
 let { ELASTICSEARCH_URL, ELASTICSEARCH_API_KEY, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD } = process.env;
@@ -60,7 +60,7 @@ async function checkRedis() {
 
 async function checkMySQL() {
   const start = Date.now();
-  const prisma = new PrismaClient();
+  const prisma = sharedPrisma;
   try {
     await prisma.$queryRaw`SELECT 1 AS ok`;
     const ms = Date.now() - start;
