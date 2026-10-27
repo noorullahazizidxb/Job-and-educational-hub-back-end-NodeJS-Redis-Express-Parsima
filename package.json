@@ -27,7 +27,8 @@
     "deploy:vercel": "bash scripts/deploy-vercel.sh",
     "deploy:vercel:all": "bash scripts/deploy-vercel-all.sh",
     "docker:up": "bash scripts/docker-up.sh",
-    "dev:vercel": "node ./scripts/dev-vercel.mjs"
+    "dev:vercel": "node ./scripts/dev-vercel.mjs",
+    "test": "node --test test/"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.1.1",

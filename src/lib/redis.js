@@ -110,5 +110,9 @@ if (redisEnabled) {
   });
 }
 
+export async function closeRedis() {
+  if (redisEnabled && redis.status !== 'end') await redis.quit();
+}
+
 export { redis };
 export default redis;
