@@ -44,6 +44,12 @@ export function initWebSocket(httpServer) {
 
 export function getIO() { return io; }
 
+/** Disconnect all sockets and close the Socket.IO server (and its HTTP server). */
+export function closeWebSocket() {
+  if (!io) return Promise.resolve();
+  return new Promise((resolve) => io.close(() => resolve()));
+}
+
 export function notifyUserInbox(userId, payload) {
   if (!io) return;
   io.to(`user:${userId}`).emit('inbox:update', payload);
